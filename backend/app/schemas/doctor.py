@@ -5,6 +5,9 @@ class DoctorBase(BaseModel):
     name: str
     specialty: str
     email: EmailStr
+    hospital: str | None = None
+    years_experience: int | None = None
+    verified: bool = False
 
 
 class DoctorCreate(DoctorBase):

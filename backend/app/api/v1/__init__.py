@@ -1,10 +1,14 @@
 from fastapi import APIRouter
 
 from .auth import router as auth_router
-from .users import router as users_router
+from .complaints import router as complaints_router
 from .doctors import router as doctors_router
+from .safety import router as safety_router
+from .users import router as users_router
 
 router = APIRouter()
 router.include_router(auth_router)
 router.include_router(users_router)
 router.include_router(doctors_router)
+router.include_router(safety_router)
+router.include_router(complaints_router)

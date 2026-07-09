@@ -1,7 +1,7 @@
 const Footer = () => {
   return (
-    <footer className="p-4 bg-gray-100 text-center text-sm text-gray-600 mt-8">
-      © 2026 Hospital Management System
+    <footer className="mt-8 border-t border-slate-800 bg-slate-950/80 p-6 text-center text-sm text-slate-500">
+      © 2026 DoctorTrust Network. Built for doctor safety, transparency, and rapid support.
     </footer>
   );
 };
