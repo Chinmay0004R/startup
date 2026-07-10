@@ -11,7 +11,12 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div style={{
+        minHeight: '100vh',
+        background: 'linear-gradient(to bottom, #0f172a, #1a2941, #0f172a)',
+        color: '#f1f5f9',
+        fontFamily: "'Inter', system-ui, sans-serif"
+      }}>
         <Routes>
           <Route path="/" element={<Login setCurrentRole={setCurrentRole} currentRole={currentRole} />} />
           <Route path="/login" element={<Login setCurrentRole={setCurrentRole} currentRole={currentRole} />} />

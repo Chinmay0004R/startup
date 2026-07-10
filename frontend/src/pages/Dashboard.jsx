@@ -1,8 +1,8 @@
 const Dashboard = () => {
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">Dashboard</h2>
-      <p className="text-gray-600">Welcome to your hospital dashboard.</p>
+    <div style={{ padding: '1.5rem', color: '#f1f5f9' }}>
+      <h2 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '1rem' }}>Dashboard</h2>
+      <p style={{ color: '#94a3b8' }}>Welcome to your hospital dashboard.</p>
     </div>
   );
 };

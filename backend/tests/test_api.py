@@ -21,11 +21,27 @@ class SafetyNetworkAPITests(unittest.TestCase):
             "email": "sara@example.com",
             "hospital": "City General Hospital",
             "years_experience": 12,
+            "registration_number": "REG-1001",
             "verified": True,
         }
         response = self.client.post("/api/v1/doctors/", json=payload)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["name"], payload["name"])
+        self.assertEqual(response.json()["registration_number"], payload["registration_number"])
+
+    def test_search_doctors_by_registration_number(self):
+        self.client.post(
+            "/api/v1/doctors/",
+            json={
+                "name": "Dr. Naveed Aslam",
+                "specialty": "Neurology",
+                "email": "naveed@example.com",
+                "registration_number": "REG-7002",
+            },
+        )
+        response = self.client.get("/api/v1/doctors/?search=REG-7002")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(any(doctor["registration_number"] == "REG-7002" for doctor in response.json()))
 
     def test_emergency_alert_endpoint(self):
         payload = {

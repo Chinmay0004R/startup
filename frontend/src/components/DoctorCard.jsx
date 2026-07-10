@@ -1,19 +1,87 @@
-const DoctorCard = ({ name, specialty, hospital, verified, yearsExperience }) => {
+import { FaStethoscope, FaHospital, FaCalendar, FaCheckCircle } from 'react-icons/fa';
+
+const DoctorCard = ({ name, specialty, hospital, verified, yearsExperience, registrationNumber, registration_number }) => {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-slate-950/20">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="font-semibold text-white">{name}</h3>
-          <p className="text-sm text-blue-300">{specialty}</p>
+    <div className="card-hover" style={{ padding: '1.5rem' }}>
+      {/* Header with icon */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+        <div style={{
+          width: '48px',
+          height: '48px',
+          borderRadius: '0.75rem',
+          background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(29, 78, 216, 0.1))',
+          border: '1px solid rgba(59, 130, 246, 0.2)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+          transition: 'all 0.3s ease'
+        }}>
+          <FaStethoscope style={{ color: '#60a5fa', fontSize: '1.125rem' }} />
         </div>
-        {verified && (
-          <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300">
-            Verified
-          </span>
-        )}
+        <div style={{ flex: 1 }}>
+          <h3 style={{ fontWeight: 700, color: '#f1f5f9', fontSize: '1.125rem', margin: '0 0 0.25rem 0' }}>
+            {name}
+          </h3>
+          <p style={{ fontSize: '0.9rem', color: '#60a5fa', fontWeight: 500, margin: 0 }}>
+            {specialty}
+          </p>
+        </div>
       </div>
-      <p className="mt-3 text-sm text-slate-400">{hospital}</p>
-      <p className="mt-1 text-sm text-slate-500">{yearsExperience}+ years experience</p>
+
+      {/* Verified badge */}
+      {verified && (
+        <div className="badge badge-success" style={{ marginBottom: '1rem', width: 'fit-content' }}>
+          <FaCheckCircle style={{ fontSize: '0.75rem' }} />
+          Verified
+        </div>
+      )}
+
+      {/* Hospital info */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.9rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#64748b' }}>
+          <FaHospital style={{ flexShrink: 0, color: '#475569' }} />
+          <span style={{ transition: 'color 0.3s ease' }}>
+            {hospital || 'Pending verification'}
+          </span>
+        </div>
+        {(registrationNumber || registration_number) && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#64748b' }}>
+            <span style={{ transition: 'color 0.3s ease' }}>
+              Reg. no: {registrationNumber || registration_number}
+            </span>
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', color: '#64748b' }}>
+          <FaCalendar style={{ flexShrink: 0, color: '#475569' }} />
+          <span style={{ transition: 'color 0.3s ease' }}>
+            {yearsExperience}+ years experience
+          </span>
+        </div>
+      </div>
+
+      {/* Hover action */}
+      <button style={{
+        marginTop: '1rem',
+        width: '100%',
+        padding: '0.5rem',
+        borderRadius: '0.5rem',
+        border: '1px solid rgba(59, 130, 246, 0.3)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        color: '#93c5fd',
+        fontSize: '0.9rem',
+        fontWeight: 500,
+        cursor: 'pointer',
+        transition: 'all 0.2s ease'
+      }} onMouseEnter={e => {
+        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+      }} onMouseLeave={e => {
+        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+      }}>
+        View Profile
+      </button>
     </div>
   );
 };

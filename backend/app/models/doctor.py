@@ -10,3 +10,4 @@ class Doctor(Base):
     name = Column(String(100), nullable=False)
     specialty = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
+    registration_number = Column(String(100), nullable=True, index=True)

@@ -7,6 +7,7 @@ class DoctorBase(BaseModel):
     email: EmailStr
     hospital: str | None = None
     years_experience: int | None = None
+    registration_number: str | None = None
     verified: bool = False
 
 
