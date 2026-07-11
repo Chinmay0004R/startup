@@ -41,3 +41,21 @@ export const createComplaint = async (complaint) =>
     method: 'POST',
     body: JSON.stringify(complaint),
   });
+
+export const registerUser = async (payload) =>
+  request('/api/v1/auth/register', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const verifyUser = async (payload) =>
+  request('/api/v1/auth/verify', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const loginUser = async (payload) =>
+  request('/api/v1/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });

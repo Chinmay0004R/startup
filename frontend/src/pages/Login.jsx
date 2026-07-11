@@ -2,11 +2,14 @@ import { useState } from 'react';
 import { GoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { FaEnvelope, FaLock, FaStethoscope, FaUser } from 'react-icons/fa';
+import { registerUser, verifyUser, loginUser } from '../services/api';
 
 const Login = ({ setCurrentRole, currentRole }) => {
   const [role, setRole] = useState('doctor');
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ name: '', email: '', password: '', otp: '' });
   const [message, setMessage] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   const navigate = useNavigate();
 
   const resolveLoginRole = (emailValue, selectedRole) => {
@@ -45,7 +48,7 @@ const Login = ({ setCurrentRole, currentRole }) => {
     }
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     if (!form.email || !form.password) {
@@ -53,14 +56,54 @@ const Login = ({ setCurrentRole, currentRole }) => {
       return;
     }
 
-    const normalizedRole = resolveLoginRole(form.email, role);
-    setCurrentRole(normalizedRole);
-    setMessage(`${normalizedRole === 'doctor' ? 'Doctor' : 'User'} login successful.`);
+    if (isRegistering) {
+      if (!form.name) {
+        setMessage('Please enter your name.');
+        return;
+      }
 
-    if (normalizedRole === 'doctor') {
-      navigate('/doctors');
-    } else {
-      navigate('/support');
+      try {
+        const response = await registerUser({ name: form.name, email: form.email, password: form.password });
+        setOtpSent(true);
+        setMessage(`Verification code sent to ${form.email}. Please enter the OTP below.`);
+        console.log('OTP:', response.otp);
+      } catch (error) {
+        setMessage(error.message || 'Registration failed.');
+      }
+      return;
+    }
+
+    try {
+      const response = await loginUser({ email: form.email, password: form.password });
+      const normalizedRole = resolveLoginRole(form.email, role);
+      setCurrentRole(normalizedRole);
+      setMessage(response.message || `${normalizedRole === 'doctor' ? 'Doctor' : 'User'} login successful.`);
+
+      if (normalizedRole === 'doctor') {
+        navigate('/doctors');
+      } else {
+        navigate('/support');
+      }
+    } catch (error) {
+      setMessage(error.message || 'Login failed.');
+    }
+  };
+
+  const handleVerifyOtp = async (event) => {
+    event.preventDefault();
+
+    if (!form.email || !form.otp) {
+      setMessage('Please enter your email and OTP.');
+      return;
+    }
+
+    try {
+      const response = await verifyUser({ email: form.email, otp: form.otp });
+      setIsRegistering(false);
+      setOtpSent(false);
+      setMessage(response.message || 'Email verified successfully. You can now log in.');
+    } catch (error) {
+      setMessage(error.message || 'Verification failed.');
     }
   };
 
@@ -133,10 +176,10 @@ const Login = ({ setCurrentRole, currentRole }) => {
             color: '#f1f5f9',
             marginBottom: '0.5rem'
           }}>
-            Welcome back
+            Register now
           </h2>
           <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-            Sign in as a doctor or patient user
+            Create your account and verify your email to continue.
           </p>
 
           {/* Role Toggle */}
@@ -197,7 +240,27 @@ const Login = ({ setCurrentRole, currentRole }) => {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} style={{ marginBottom: '1rem' }}>
+          <form onSubmit={isRegistering && otpSent ? handleVerifyOtp : handleSubmit} style={{ marginBottom: '1rem' }}>
+            {isRegistering && !otpSent && (
+              <div style={{ position: 'relative', marginBottom: '1rem' }}>
+                <FaUser style={{
+                  position: 'absolute',
+                  left: '0.75rem',
+                  top: '0.75rem',
+                  color: '#64748b',
+                  zIndex: 1
+                }} />
+                <input
+                  className="input-field"
+                  placeholder="Full name"
+                  type="text"
+                  value={form.name}
+                  onChange={(event) => setForm({ ...form, name: event.target.value })}
+                  style={{ paddingLeft: '2.5rem' }}
+                />
+              </div>
+            )}
+
             <div style={{ position: 'relative', marginBottom: '1rem' }}>
               <FaEnvelope style={{
                 position: 'absolute',
@@ -215,7 +278,7 @@ const Login = ({ setCurrentRole, currentRole }) => {
                 style={{ paddingLeft: '2.5rem' }}
               />
             </div>
-            <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+            <div style={{ position: 'relative', marginBottom: '1rem' }}>
               <FaLock style={{
                 position: 'absolute',
                 left: '0.75rem',
@@ -232,14 +295,56 @@ const Login = ({ setCurrentRole, currentRole }) => {
                 style={{ paddingLeft: '2.5rem' }}
               />
             </div>
+
+            {(isRegistering && otpSent) && (
+              <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                <FaLock style={{
+                  position: 'absolute',
+                  left: '0.75rem',
+                  top: '0.75rem',
+                  color: '#64748b',
+                  zIndex: 1
+                }} />
+                <input
+                  className="input-field"
+                  placeholder="Enter verification OTP"
+                  type="text"
+                  value={form.otp}
+                  onChange={(event) => setForm({ ...form, otp: event.target.value })}
+                  style={{ paddingLeft: '2.5rem' }}
+                />
+              </div>
+            )}
+
             <button 
               className="btn btn-primary" 
               type="submit"
-              style={{ width: '100%' }}
+              style={{ width: '100%', marginBottom: '0.75rem' }}
             >
-              Sign in as {role === 'doctor' ? 'Doctor' : 'Patient'}
+              {isRegistering ? (otpSent ? 'Verify OTP' : 'Register') : 'Sign in'}
             </button>
           </form>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsRegistering((prev) => !prev);
+              setOtpSent(false);
+              setMessage('');
+            }}
+            style={{
+              width: '100%',
+              padding: '0.75rem',
+              borderRadius: '0.5rem',
+              border: '1px solid rgba(71, 85, 105, 0.4)',
+              background: 'transparent',
+              color: '#cbd5e1',
+              cursor: 'pointer',
+              marginBottom: '1rem'
+            }}
+          >
+            {isRegistering ? 'Switch to Login' : 'Switch to Register'}
+          </button>
 
           <div style={{ marginBottom: '1rem' }}>
             <div style={{
@@ -295,7 +400,7 @@ const Login = ({ setCurrentRole, currentRole }) => {
           fontSize: '0.8rem',
           color: '#475569'
         }}>
-          Use any email and password. Doctors are sent to the registration page.
+          Only verified email accounts can log in. Use a valid email address to register and verify it first.
         </p>
       </div>
     </div>
