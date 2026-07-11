@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from app.schemas.doctor import DoctorCreate, DoctorRead
 
@@ -24,6 +24,15 @@ def list_doctors(search: str | None = None):
         or query in (doctor.hospital or "").lower()
         or query in (doctor.registration_number or "").lower()
     ]
+
+
+@router.get("/{doctor_id}", response_model=DoctorRead)
+def get_doctor(doctor_id: int):
+    for doctor in DOCTORS:
+        if doctor.id == doctor_id:
+            return doctor
+
+    raise HTTPException(status_code=404, detail="Doctor not found")
 
 
 @router.post("/", response_model=DoctorRead)

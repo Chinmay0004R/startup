@@ -43,6 +43,33 @@ class SafetyNetworkAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(any(doctor["registration_number"] == "REG-7002" for doctor in response.json()))
 
+    def test_create_post_endpoint(self):
+        payload = {
+            "author_name": "Dr. Sara Khan",
+            "content": "Today I am sharing my first update from the doctor dashboard.",
+        }
+        response = self.client.post("/api/v1/posts/", json=payload)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["author_name"], payload["author_name"])
+        self.assertEqual(response.json()["likes"], 0)
+
+    def test_list_posts_endpoint(self):
+        self.client.post("/api/v1/posts/", json={"author_name": "Dr. Ali", "content": "Post one"})
+        self.client.post("/api/v1/posts/", json={"author_name": "Dr. Ayesha", "content": "Post two"})
+
+        response = self.client.get("/api/v1/posts/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response.json(), list)
+        self.assertGreaterEqual(len(response.json()), 2)
+
+    def test_like_post_endpoint(self):
+        create_response = self.client.post("/api/v1/posts/", json={"author_name": "Dr. Naveed", "content": "Please like this post"})
+        post_id = create_response.json()["id"]
+
+        response = self.client.post(f"/api/v1/posts/{post_id}/like")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["likes"], 1)
+
     def test_emergency_alert_endpoint(self):
         payload = {
             "doctor_name": "Dr. Ali Hassan",

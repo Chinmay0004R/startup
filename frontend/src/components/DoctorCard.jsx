@@ -1,6 +1,6 @@
 import { FaStethoscope, FaHospital, FaCalendar, FaCheckCircle } from 'react-icons/fa';
 
-const DoctorCard = ({ name, specialty, hospital, verified, yearsExperience, registrationNumber, registration_number }) => {
+const DoctorCard = ({ name, specialty, hospital, verified, yearsExperience, registrationNumber, registration_number, onViewProfile }) => {
   return (
     <div className="card-hover" style={{ padding: '1.5rem' }}>
       {/* Header with icon */}
@@ -61,25 +61,33 @@ const DoctorCard = ({ name, specialty, hospital, verified, yearsExperience, regi
       </div>
 
       {/* Hover action */}
-      <button style={{
-        marginTop: '1rem',
-        width: '100%',
-        padding: '0.5rem',
-        borderRadius: '0.5rem',
-        border: '1px solid rgba(59, 130, 246, 0.3)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        color: '#93c5fd',
-        fontSize: '0.9rem',
-        fontWeight: 500,
-        cursor: 'pointer',
-        transition: 'all 0.2s ease'
-      }} onMouseEnter={e => {
-        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
-      }} onMouseLeave={e => {
-        e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-      }}>
+      <button
+        type="button"
+        onClick={onViewProfile}
+        style={{
+          marginTop: '1rem',
+          width: '100%',
+          padding: '0.5rem',
+          borderRadius: '0.5rem',
+          border: '1px solid rgba(59, 130, 246, 0.3)',
+          backgroundColor: onViewProfile ? 'rgba(59, 130, 246, 0.1)' : 'rgba(71, 85, 105, 0.2)',
+          color: '#93c5fd',
+          fontSize: '0.9rem',
+          fontWeight: 500,
+          cursor: onViewProfile ? 'pointer' : 'default',
+          transition: 'all 0.2s ease'
+        }}
+        onMouseEnter={e => {
+          if (!onViewProfile) return;
+          e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+          e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+        }}
+        onMouseLeave={e => {
+          if (!onViewProfile) return;
+          e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+          e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+        }}
+      >
         View Profile
       </button>
     </div>

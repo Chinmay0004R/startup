@@ -2,6 +2,9 @@ import { NavLink } from 'react-router-dom';
 import { FaStethoscope, FaHome, FaUsers, FaLifeRing, FaSignInAlt } from 'react-icons/fa';
 
 const Navbar = () => {
+  const storedRole = typeof window !== 'undefined' ? localStorage.getItem('currentRole') : null;
+  const homePath = storedRole === 'doctor' ? '/doctors/edit' : storedRole === 'user' ? '/patient-profile' : '/';
+
   return (
     <nav style={{
       position: 'sticky',
@@ -22,7 +25,7 @@ const Navbar = () => {
         height: '70px'
       }}>
         {/* Logo */}
-        <NavLink to="/" style={{
+        <NavLink to={homePath} style={{
           display: 'flex',
           alignItems: 'center',
           gap: '0.75rem',
@@ -63,7 +66,7 @@ const Navbar = () => {
           gap: '0.5rem',
           color: '#cbd5e1'
         }}>
-          <NavLink to="/" style={({ isActive }) => ({
+          <NavLink to={homePath} style={({ isActive }) => ({
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',

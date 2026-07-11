@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { FaEnvelope, FaLock, FaStethoscope, FaUser } from 'react-icons/fa';
 import { registerUser, verifyUser, loginUser } from '../services/api';
 
-const Login = ({ setCurrentRole, currentRole }) => {
+const Login = ({ setCurrentRole, setCurrentUserEmail, currentRole }) => {
   const [role, setRole] = useState('doctor');
   const [form, setForm] = useState({ name: '', email: '', password: '', otp: '' });
   const [message, setMessage] = useState('');
@@ -77,6 +77,7 @@ const Login = ({ setCurrentRole, currentRole }) => {
       const response = await loginUser({ email: form.email, password: form.password });
       const normalizedRole = resolveLoginRole(form.email, role);
       setCurrentRole(normalizedRole);
+      setCurrentUserEmail(form.email);
       setMessage(response.message || `${normalizedRole === 'doctor' ? 'Doctor' : 'User'} login successful.`);
 
       if (normalizedRole === 'doctor') {
@@ -101,7 +102,10 @@ const Login = ({ setCurrentRole, currentRole }) => {
       const response = await verifyUser({ email: form.email, otp: form.otp });
       setIsRegistering(false);
       setOtpSent(false);
-      setMessage(response.message || 'Email verified successfully. You can now log in.');
+      setCurrentRole('doctor');
+      setCurrentUserEmail(form.email);
+      setMessage(response.message || 'Email verified successfully. Redirecting to your doctor page...');
+      navigate('/doctors');
     } catch (error) {
       setMessage(error.message || 'Verification failed.');
     }

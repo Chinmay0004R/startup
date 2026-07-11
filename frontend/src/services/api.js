@@ -34,6 +34,22 @@ export const createSafetyAlert = async (alert) =>
     body: JSON.stringify(alert),
   });
 
+export const fetchPosts = async (authorId) =>
+  request(authorId ? `/api/v1/posts/?author_id=${authorId}` : '/api/v1/posts/');
+
+export const createPost = async (post) =>
+  request('/api/v1/posts/', {
+    method: 'POST',
+    body: JSON.stringify(post),
+  });
+
+export const fetchDoctorById = async (doctorId) => request(`/api/v1/doctors/${doctorId}`);
+
+export const likePost = async (postId) =>
+  request(`/api/v1/posts/${postId}/like`, {
+    method: 'POST',
+  });
+
 export const fetchComplaints = async () => request('/api/v1/complaints/');
 
 export const createComplaint = async (complaint) =>
