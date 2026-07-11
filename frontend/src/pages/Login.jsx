@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { GoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
 import { FaEnvelope, FaLock, FaStethoscope, FaUser } from 'react-icons/fa';
 
@@ -8,6 +9,42 @@ const Login = ({ setCurrentRole, currentRole }) => {
   const [message, setMessage] = useState('');
   const navigate = useNavigate();
 
+  const resolveLoginRole = (emailValue, selectedRole) => {
+    const normalizedEmail = (emailValue || '').toLowerCase().trim();
+
+    if (selectedRole === 'doctor') {
+      return 'doctor';
+    }
+
+    if (normalizedEmail.includes('doctor') || normalizedEmail.endsWith('@doctor.com') || normalizedEmail.endsWith('@doctortrust.com')) {
+      return 'doctor';
+    }
+
+    return 'user';
+  };
+
+  const decodeJwtPayload = (token) => {
+    if (!token) {
+      return null;
+    }
+
+    try {
+      const payload = token.split('.')[1];
+      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+      const decoded = decodeURIComponent(
+        atob(base64)
+          .split('')
+          .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
+          .join('')
+      );
+
+      return JSON.parse(decoded);
+    } catch (error) {
+      console.error('Failed to decode Google credential payload:', error);
+      return null;
+    }
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
 
@@ -16,7 +53,7 @@ const Login = ({ setCurrentRole, currentRole }) => {
       return;
     }
 
-    const normalizedRole = role === 'doctor' ? 'doctor' : 'user';
+    const normalizedRole = resolveLoginRole(form.email, role);
     setCurrentRole(normalizedRole);
     setMessage(`${normalizedRole === 'doctor' ? 'Doctor' : 'User'} login successful.`);
 
@@ -25,6 +62,30 @@ const Login = ({ setCurrentRole, currentRole }) => {
     } else {
       navigate('/support');
     }
+  };
+
+  const handleGoogleSuccess = (credentialResponse) => {
+    const token = credentialResponse?.credential;
+    const payload = decodeJwtPayload(token);
+    const email = payload?.email || '';
+    const normalizedRole = resolveLoginRole(email, role);
+
+    setCurrentRole(normalizedRole);
+    setMessage(
+      normalizedRole === 'doctor'
+        ? 'Google doctor sign-in successful. Redirecting to the doctor portal.'
+        : 'Google sign-in successful. Redirecting to the patient portal.'
+    );
+
+    if (normalizedRole === 'doctor') {
+      navigate('/doctors');
+    } else {
+      navigate('/support');
+    }
+  };
+
+  const handleGoogleError = () => {
+    setMessage('Google sign-in failed. Please try again.');
   };
 
   return (
@@ -180,6 +241,29 @@ const Login = ({ setCurrentRole, currentRole }) => {
             </button>
           </form>
 
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '0.75rem'
+            }}>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(71, 85, 105, 0.4)' }} />
+              <span style={{ color: '#64748b', fontSize: '0.8rem' }}>or continue with</span>
+              <div style={{ flex: 1, height: '1px', background: 'rgba(71, 85, 105, 0.4)' }} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                theme="filled_blue"
+                size="large"
+                text="signin_with"
+                shape="pill"
+              />
+            </div>
+          </div>
+
           {/* Messages */}
           {message && (
             <div style={{
@@ -211,7 +295,7 @@ const Login = ({ setCurrentRole, currentRole }) => {
           fontSize: '0.8rem',
           color: '#475569'
         }}>
-          Demo credentials: Any email and password
+          Use any email and password. Doctors are sent to the registration page.
         </p>
       </div>
     </div>
