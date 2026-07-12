@@ -1,411 +1,441 @@
 import { useState } from 'react';
-import { GoogleLogin } from '@react-oauth/google';
 import { useNavigate } from 'react-router-dom';
-import { FaEnvelope, FaLock, FaStethoscope, FaUser } from 'react-icons/fa';
-import { registerUser, verifyUser, loginUser } from '../services/api';
+import { FaEnvelope, FaLock, FaStethoscope, FaEye, FaEyeSlash } from 'react-icons/fa';
 
-const Login = ({ setCurrentRole, setCurrentUserEmail, currentRole }) => {
-  const [role, setRole] = useState('doctor');
-  const [form, setForm] = useState({ name: '', email: '', password: '', otp: '' });
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+
+const Login = ({ setCurrentRole, setCurrentUserEmail, setAuthToken }) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [form, setForm] = useState({
+    email: '',
+    password: '',
+  });
+  
   const [message, setMessage] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
+  const [messageType, setMessageType] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  
   const navigate = useNavigate();
 
-  const resolveLoginRole = (emailValue, selectedRole) => {
-    const normalizedEmail = (emailValue || '').toLowerCase().trim();
-
-    if (selectedRole === 'doctor') {
-      return 'doctor';
-    }
-
-    if (normalizedEmail.includes('doctor') || normalizedEmail.endsWith('@doctor.com') || normalizedEmail.endsWith('@doctortrust.com')) {
-      return 'doctor';
-    }
-
-    return 'user';
+  const showNotification = (msg, type = 'error') => {
+    setMessage(msg);
+    setMessageType(type);
+    setTimeout(() => setMessage(''), 5000);
   };
 
-  const decodeJwtPayload = (token) => {
-    if (!token) {
-      return null;
-    }
-
-    try {
-      const payload = token.split('.')[1];
-      const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-      const decoded = decodeURIComponent(
-        atob(base64)
-          .split('')
-          .map((char) => `%${`00${char.charCodeAt(0).toString(16)}`.slice(-2)}`)
-          .join('')
-      );
-
-      return JSON.parse(decoded);
-    } catch (error) {
-      console.error('Failed to decode Google credential payload:', error);
-      return null;
-    }
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const validateEmail = (email) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
 
-    if (!form.email || !form.password) {
-      setMessage('Please enter both email and password.');
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    if (!validateEmail(form.email)) {
+      showNotification('Please enter a valid email', 'error');
+      setIsLoading(false);
       return;
     }
 
-    if (isRegistering) {
-      if (!form.name) {
-        setMessage('Please enter your name.');
+    if (!form.password) {
+      showNotification('Please enter your password', 'error');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        showNotification(data.detail || 'Login failed', 'error');
+        setIsLoading(false);
         return;
       }
 
-      try {
-        const response = await registerUser({ name: form.name, email: form.email, password: form.password });
-        setOtpSent(true);
-        setMessage(`Verification code sent to ${form.email}. Please enter the OTP below.`);
-        console.log('OTP:', response.otp);
-      } catch (error) {
-        setMessage(error.message || 'Registration failed.');
-      }
-      return;
-    }
+      // Store auth data temporarily
+      localStorage.setItem('authToken', data.access_token);
+      localStorage.setItem('currentUserEmail', data.user.email);
+      localStorage.setItem('userName', data.user.name);
+      localStorage.setItem('userId', data.user.id || data.user.email);
 
-    try {
-      const response = await loginUser({ email: form.email, password: form.password });
-      const normalizedRole = resolveLoginRole(form.email, role);
-      setCurrentRole(normalizedRole);
-      setCurrentUserEmail(form.email);
-      setMessage(response.message || `${normalizedRole === 'doctor' ? 'Doctor' : 'User'} login successful.`);
+      setAuthToken(data.access_token);
+      setCurrentUserEmail(data.user.email);
 
-      if (normalizedRole === 'doctor') {
-        navigate('/doctors');
-      } else {
-        navigate('/support');
-      }
+      showNotification(`Welcome back!`, 'success');
+      
+      // Redirect to role setup for profile completion
+      setTimeout(() => navigate('/role-setup'), 500);
     } catch (error) {
-      setMessage(error.message || 'Login failed.');
+      showNotification('Login failed. Please try again.', 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleVerifyOtp = async (event) => {
-    event.preventDefault();
-
-    if (!form.email || !form.otp) {
-      setMessage('Please enter your email and OTP.');
-      return;
-    }
-
-    try {
-      const response = await verifyUser({ email: form.email, otp: form.otp });
-      setIsRegistering(false);
-      setOtpSent(false);
-      setCurrentRole('doctor');
-      setCurrentUserEmail(form.email);
-      setMessage(response.message || 'Email verified successfully. Redirecting to your doctor page...');
-      navigate('/doctors');
-    } catch (error) {
-      setMessage(error.message || 'Verification failed.');
-    }
+  const bgStyle = {
+    minHeight: '100vh',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '1rem',
   };
 
-  const handleGoogleSuccess = (credentialResponse) => {
-    const token = credentialResponse?.credential;
-    const payload = decodeJwtPayload(token);
-    const email = payload?.email || '';
-    const normalizedRole = resolveLoginRole(email, role);
-
-    setCurrentRole(normalizedRole);
-    setMessage(
-      normalizedRole === 'doctor'
-        ? 'Google doctor sign-in successful. Redirecting to the doctor portal.'
-        : 'Google sign-in successful. Redirecting to the patient portal.'
-    );
-
-    if (normalizedRole === 'doctor') {
-      navigate('/doctors');
-    } else {
-      navigate('/support');
-    }
+  const containerStyle = {
+    width: '100%',
+    maxWidth: '400px',
   };
 
-  const handleGoogleError = () => {
-    setMessage('Google sign-in failed. Please try again.');
+  const cardStyle = {
+    background: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: '1.5rem',
+    padding: '2.5rem',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+    backdropFilter: 'blur(10px)',
+  };
+
+  const logoStyle = {
+    textAlign: 'center',
+    marginBottom: '2rem',
+  };
+
+  const logoBadgeStyle = {
+    width: '70px',
+    height: '70px',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    borderRadius: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 1rem',
+    fontSize: '2rem',
+    color: 'white',
+    boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)',
+  };
+
+  const titleStyle = {
+    fontSize: '1.75rem',
+    fontWeight: '700',
+    color: '#1a202c',
+    marginBottom: '0.5rem',
+  };
+
+  const subtitleStyle = {
+    color: '#718096',
+    fontSize: '0.95rem',
+    marginBottom: '0.5rem',
+  };
+
+  const formGroupStyle = {
+    marginBottom: '1.25rem',
+  };
+
+  const labelStyle = {
+    display: 'block',
+    color: '#2d3748',
+    fontWeight: '600',
+    marginBottom: '0.5rem',
+    fontSize: '0.95rem',
+  };
+
+  const inputStyle = {
+    width: '100%',
+    padding: '0.875rem 1rem',
+    border: '2px solid #e2e8f0',
+    borderRadius: '0.75rem',
+    fontSize: '1rem',
+    transition: 'all 0.3s ease',
+    boxSizing: 'border-box',
+    boxShadow: 'none',
+  };
+
+  const passwordWrapperStyle = {
+    position: 'relative',
+  };
+
+  const togglePasswordStyle = {
+    position: 'absolute',
+    right: '1rem',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#718096',
+    fontSize: '1.1rem',
+  };
+
+  const buttonStyle = {
+    width: '100%',
+    padding: '0.875rem 1.5rem',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    fontWeight: '600',
+    border: 'none',
+    borderRadius: '0.75rem',
+    fontSize: '1rem',
+    cursor: 'pointer',
+    transition: 'all 0.3s ease',
+    marginTop: '0.5rem',
+    opacity: isLoading ? 0.7 : 1,
+    pointerEvents: isLoading ? 'none' : 'auto',
+  };
+
+  const toggleLinkStyle = {
+    textAlign: 'center',
+    marginTop: '1.5rem',
+    color: '#718096',
+    fontSize: '0.95rem',
+  };
+
+  const toggleButtonStyle = {
+    background: 'none',
+    border: 'none',
+    color: '#667eea',
+    fontWeight: '600',
+    cursor: 'pointer',
+    marginLeft: '0.25rem',
+    textDecoration: 'underline',
+  };
+
+  const messageStyle = {
+    padding: '1rem',
+    borderRadius: '0.75rem',
+    marginBottom: '1rem',
+    fontSize: '0.95rem',
+    backgroundColor: messageType === 'error' ? '#fed7d7' : messageType === 'success' ? '#c6f6d5' : '#bee3f8',
+    color: messageType === 'error' ? '#c53030' : messageType === 'success' ? '#22543d' : '#2c5aa0',
+    border: `1px solid ${messageType === 'error' ? '#fc8181' : messageType === 'success' ? '#9ae6b4' : '#63b3ed'}`,
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
-      <div style={{ width: '100%', maxWidth: '420px' }} className="animate-fadeInUp">
-        {/* Logo Section */}
-        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            marginBottom: '1rem'
-          }}>
-            <div style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '1rem',
-              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 20px 40px rgba(37, 99, 235, 0.3)',
-              color: 'white'
-            }}>
-              <FaStethoscope style={{ fontSize: '2rem' }} />
+    <div style={bgStyle}>
+      <div style={containerStyle}>
+        <div style={cardStyle}>
+          {/* Logo */}
+          <div style={logoStyle}>
+            <div style={logoBadgeStyle}>
+              <FaStethoscope />
             </div>
-          </div>
-          <h1 style={{
-            fontSize: '2rem',
-            fontWeight: 700,
-            background: 'linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            marginBottom: '0.5rem'
-          }}>
-            DoctorTrust
-          </h1>
-          <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Secure medical network platform</p>
-        </div>
-
-        {/* Login Card */}
-        <div className="card" style={{ marginBottom: '1rem' }}>
-          <h2 style={{
-            fontSize: '1.5rem',
-            fontWeight: 700,
-            color: '#f1f5f9',
-            marginBottom: '0.5rem'
-          }}>
-            Register now
-          </h2>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-            Create your account and verify your email to continue.
-          </p>
-
-          {/* Role Toggle */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '0.5rem',
-            marginBottom: '1.5rem',
-            padding: '0.25rem',
-            borderRadius: '0.75rem',
-            border: '1px solid rgba(71, 85, 105, 0.4)',
-            backgroundColor: 'rgba(15, 23, 42, 0.5)'
-          }}>
-            <button
-              type="button"
-              onClick={() => setRole('doctor')}
-              style={{
-                padding: '0.75rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.3s ease',
-                backgroundColor: role === 'doctor' ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : 'transparent',
-                background: role === 'doctor' ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : 'transparent',
-                color: role === 'doctor' ? 'white' : '#64748b'
-              }}
-            >
-              <FaStethoscope /> Doctor
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole('user')}
-              style={{
-                padding: '0.75rem',
-                borderRadius: '0.5rem',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '0.9rem',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                transition: 'all 0.3s ease',
-                backgroundColor: role === 'user' ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : 'transparent',
-                background: role === 'user' ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' : 'transparent',
-                color: role === 'user' ? 'white' : '#64748b'
-              }}
-            >
-              <FaUser /> Patient
-            </button>
+            <h1 style={titleStyle}>Healthcare Hub</h1>
+            <p style={subtitleStyle}>Connect, Share, Heal Together</p>
           </div>
 
-          {/* Form */}
-          <form onSubmit={isRegistering && otpSent ? handleVerifyOtp : handleSubmit} style={{ marginBottom: '1rem' }}>
-            {isRegistering && !otpSent && (
-              <div style={{ position: 'relative', marginBottom: '1rem' }}>
-                <FaUser style={{
-                  position: 'absolute',
-                  left: '0.75rem',
-                  top: '0.75rem',
-                  color: '#64748b',
-                  zIndex: 1
-                }} />
-                <input
-                  className="input-field"
-                  placeholder="Full name"
-                  type="text"
-                  value={form.name}
-                  onChange={(event) => setForm({ ...form, name: event.target.value })}
-                  style={{ paddingLeft: '2.5rem' }}
-                />
+          {/* Message */}
+          {message && <div style={messageStyle}>{message}</div>}
+
+          {/* Role Selection - only show in register mode */}
+          {isRegistering && !showVerification && (
+            <>
+              <p style={{ color: '#4a5568', marginBottom: '0.75rem', fontWeight: '500' }}>I am a:</p>
+              <div style={roleButtonsStyle}>
+                <button
+                  type="button"
+                  onClick={() => setRole('doctor')}
+                  style={roleButtonStyle(role === 'doctor')}
+                >
+                  <FaStethoscope /> Doctor
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('patient')}
+                  style={roleButtonStyle(role === 'patient')}
+                >
+                  <FaUser /> Patient
+                </button>
               </div>
-            )}
-
-            <div style={{ position: 'relative', marginBottom: '1rem' }}>
-              <FaEnvelope style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '0.75rem',
-                color: '#64748b',
-                zIndex: 1
-              }} />
-              <input
-                className="input-field"
-                placeholder="Email address"
-                type="email"
-                value={form.email}
-                onChange={(event) => setForm({ ...form, email: event.target.value })}
-                style={{ paddingLeft: '2.5rem' }}
-              />
-            </div>
-            <div style={{ position: 'relative', marginBottom: '1rem' }}>
-              <FaLock style={{
-                position: 'absolute',
-                left: '0.75rem',
-                top: '0.75rem',
-                color: '#64748b',
-                zIndex: 1
-              }} />
-              <input
-                className="input-field"
-                placeholder="Password"
-                type="password"
-                value={form.password}
-                onChange={(event) => setForm({ ...form, password: event.target.value })}
-                style={{ paddingLeft: '2.5rem' }}
-              />
-            </div>
-
-            {(isRegistering && otpSent) && (
-              <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
-                <FaLock style={{
-                  position: 'absolute',
-                  left: '0.75rem',
-                  top: '0.75rem',
-                  color: '#64748b',
-                  zIndex: 1
-                }} />
-                <input
-                  className="input-field"
-                  placeholder="Enter verification OTP"
-                  type="text"
-                  value={form.otp}
-                  onChange={(event) => setForm({ ...form, otp: event.target.value })}
-                  style={{ paddingLeft: '2.5rem' }}
-                />
-              </div>
-            )}
-
-            <button 
-              className="btn btn-primary" 
-              type="submit"
-              style={{ width: '100%', marginBottom: '0.75rem' }}
-            >
-              {isRegistering ? (otpSent ? 'Verify OTP' : 'Register') : 'Sign in'}
-            </button>
-          </form>
-
-          <button
-            type="button"
-            onClick={() => {
-              setIsRegistering((prev) => !prev);
-              setOtpSent(false);
-              setMessage('');
-            }}
-            style={{
-              width: '100%',
-              padding: '0.75rem',
-              borderRadius: '0.5rem',
-              border: '1px solid rgba(71, 85, 105, 0.4)',
-              background: 'transparent',
-              color: '#cbd5e1',
-              cursor: 'pointer',
-              marginBottom: '1rem'
-            }}
-          >
-            {isRegistering ? 'Switch to Login' : 'Switch to Register'}
-          </button>
-
-          <div style={{ marginBottom: '1rem' }}>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.75rem',
-              marginBottom: '0.75rem'
-            }}>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(71, 85, 105, 0.4)' }} />
-              <span style={{ color: '#64748b', fontSize: '0.8rem' }}>or continue with</span>
-              <div style={{ flex: 1, height: '1px', background: 'rgba(71, 85, 105, 0.4)' }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={handleGoogleError}
-                theme="filled_blue"
-                size="large"
-                text="signin_with"
-                shape="pill"
-              />
-            </div>
-          </div>
-
-          {/* Messages */}
-          {message && (
-            <div style={{
-              padding: '0.75rem',
-              borderRadius: '0.5rem',
-              fontSize: '0.9rem',
-              fontWeight: 500,
-              marginBottom: '1rem',
-              backgroundColor: message.includes('successful') ? 'rgba(16, 185, 129, 0.1)' : 'rgba(251, 146, 60, 0.1)',
-              border: `1px solid ${message.includes('successful') ? 'rgba(16, 185, 129, 0.3)' : 'rgba(251, 146, 60, 0.3)'}`,
-              color: message.includes('successful') ? '#86efac' : '#fed7aa'
-            }}>
-              {message}
-            </div>
+            </>
           )}
 
-          <p style={{
-            textAlign: 'center',
-            fontSize: '0.85rem',
-            color: '#64748b'
-          }}>
-            <span style={{ fontWeight: 600 }}>Session:</span> {currentRole ? `${currentRole.charAt(0).toUpperCase() + currentRole.slice(1)} logged in` : 'Not signed in'}
-          </p>
-        </div>
+          {/* Forms */}
+          {showVerification ? (
+            // OTP Verification Form
+            <form onSubmit={handleVerifyOtp}>
+              <h2 style={{ ...titleStyle, fontSize: '1.5rem', marginBottom: '1rem' }}>Verify Email</h2>
+              <p style={{ color: '#718096', marginBottom: '1.5rem' }}>Enter the code sent to {form.email}</p>
+              
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Verification Code</label>
+                <input
+                  type="text"
+                  name="otp"
+                  value={form.otp}
+                  onChange={handleInputChange}
+                  placeholder="000000"
+                  maxLength="6"
+                  style={inputStyle}
+                />
+              </div>
 
-        {/* Footer */}
-        <p style={{
-          textAlign: 'center',
-          fontSize: '0.8rem',
-          color: '#475569'
-        }}>
-          Only verified email accounts can log in. Use a valid email address to register and verify it first.
-        </p>
+              <button type="submit" style={buttonStyle} disabled={isLoading}>
+                {isLoading ? 'Verifying...' : 'Verify Email'}
+              </button>
+
+              <div style={toggleLinkStyle}>
+                <button
+                  type="button"
+                  onClick={() => setShowVerification(false)}
+                  style={toggleButtonStyle}
+                >
+                  Back
+                </button>
+              </div>
+            </form>
+          ) : isRegistering ? (
+            // Register Form
+            <form onSubmit={handleRegister}>
+              <h2 style={{ ...titleStyle, fontSize: '1.5rem', marginBottom: '1rem' }}>Create Account</h2>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Full Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={form.name}
+                  onChange={handleInputChange}
+                  placeholder="Dr. John Doe"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleInputChange}
+                  placeholder="you@example.com"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Password</label>
+                <div style={passwordWrapperStyle}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    value={form.password}
+                    onChange={handleInputChange}
+                    placeholder="At least 6 characters"
+                    style={inputStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={togglePasswordStyle}
+                  >
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
+                </div>
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Confirm Password</label>
+                <div style={passwordWrapperStyle}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    name="confirmPassword"
+                    value={form.confirmPassword}
+                    onChange={handleInputChange}
+                    placeholder="Confirm your password"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+
+              <button type="submit" style={buttonStyle} disabled={isLoading}>
+                {isLoading ? 'Creating Account...' : 'Create Account'}
+              </button>
+
+              <div style={toggleLinkStyle}>
+                Already have an account?
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegistering(false);
+                    setForm({ name: '', email: '', password: '', confirmPassword: '', otp: '' });
+                  }}
+                  style={toggleButtonStyle}
+                >
+                  Login
+                </button>
+              </div>
+            </form>
+          ) : (
+            // Login Form
+            <form onSubmit={handleLogin}>
+              <h2 style={{ ...titleStyle, fontSize: '1.5rem', marginBottom: '1rem' }}>Welcome Back</h2>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Email</label>
+                <input
+                  type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleInputChange}
+                  placeholder="you@example.com"
+                  style={inputStyle}
+                />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Password</label>
+                <div style={passwordWrapperStyle}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    value={form.password}
+                    onChange={handleInputChange}
+                    placeholder="Enter your password"
+                    style={inputStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={togglePasswordStyle}
+                  >
+                    {showPassword ? <FaEyeSlash /> : <FaEye />}
+                  </button>
+                </div>
+              </div>
+
+              <button type="submit" style={buttonStyle} disabled={isLoading}>
+                {isLoading ? 'Logging in...' : 'Login'}
+              </button>
+
+              <div style={toggleLinkStyle}>
+                Don't have an account?
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRegistering(true);
+                    setForm({ name: '', email: '', password: '', confirmPassword: '', otp: '' });
+                  }}
+                  style={toggleButtonStyle}
+                >
+                  Register
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   );

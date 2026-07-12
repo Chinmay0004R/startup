@@ -27,7 +27,7 @@ const PatientProfile = () => {
   const handleSave = async (event) => {
     event.preventDefault();
     setIsSaving(true);
-    setStatus('Saving your patient profile...');
+    setStatus('Saving your user profile...');
 
     try {
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -60,8 +60,8 @@ const PatientProfile = () => {
                 color: '#60a5fa',
                 fontWeight: 700,
                 marginBottom: '0.75rem',
-              }}>Patient Profile</p>
-              <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.75rem)', color: 'white', margin: 0 }}>Edit your patient details</h1>
+              }}>User Profile</p>
+              <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.75rem)', color: 'white', margin: 0 }}>Edit your user details</h1>
               <p style={{ color: '#cbd5e1', marginTop: '1rem' }}>
                 Keep your contact and medical information current so providers can deliver better care.
               </p>

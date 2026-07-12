@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -116,6 +117,24 @@ class SafetyNetworkAPITests(unittest.TestCase):
         )
         self.assertEqual(login_response.status_code, 200)
         self.assertEqual(login_response.json()["message"], "Login successful")
+
+    def test_google_login_flow(self):
+        with patch("app.api.v1.auth._validate_google_token") as mock_validate:
+            mock_validate.return_value = {
+                "email": "google.user@example.com",
+                "name": "Google User",
+                "picture": "https://example.com/avatar.png",
+                "email_verified": True,
+            }
+
+            response = self.client.post(
+                "/api/v1/auth/google-login",
+                json={"credential": "mock-google-id-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["user"]["email"], "google.user@example.com")
+        self.assertTrue(response.json()["user"]["is_verified"])
 
 
 if __name__ == "__main__":

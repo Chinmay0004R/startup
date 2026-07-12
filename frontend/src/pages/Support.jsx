@@ -14,10 +14,10 @@ const Support = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    loadPatientData();
+    loadUserData();
   }, []);
 
-  const loadPatientData = async () => {
+  const loadUserData = async () => {
     try {
       const [doctorData, complaintData] = await Promise.all([fetchDoctors(), fetchComplaints()]);
       setDoctors(doctorData);
@@ -123,7 +123,7 @@ const Support = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <FaStethoscope style={{ fontSize: '1.5rem', color: '#60a5fa' }} />
             <span style={{ fontSize: '0.85rem', letterSpacing: '0.18em', textTransform: 'uppercase', fontWeight: 700, color: '#93c5fd' }}>
-              Patient Portal
+              User Portal
             </span>
           </div>
           <h2 style={{ fontSize: '2.5rem', fontWeight: 700, color: '#f8fafc', marginBottom: '0.75rem' }}>

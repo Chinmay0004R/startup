@@ -236,7 +236,7 @@ const Home = ({ health }) => {
               <span style={badgeStyle}>Secure Healthcare Network</span>
             </div>
             <h2 style={heroTitleStyle}>
-              Verified care for doctors,<br />patients, and communities
+              Verified care for doctors,<br />users, and communities
             </h2>
             <p style={heroDescriptionStyle}>
               Connect with verified medical professionals, request emergency support, and report misconduct safely through one trusted platform.
