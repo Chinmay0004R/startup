@@ -1,23 +1,40 @@
 from typing import List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
 
 from app.schemas.doctor import DoctorCreate, DoctorRead
+from app.core.database import get_db
+from app.models.user import User, RoleEnum
 
 router = APIRouter(prefix="/doctors", tags=["doctors"])
 
-DOCTORS: List[DoctorRead] = []
-
 
 @router.get("/", response_model=List[DoctorRead])
-def list_doctors(search: str | None = None):
+def list_doctors(search: str | None = None, db: Session = Depends(get_db)):
     query = (search or "").strip().lower()
+    users = db.query(User).filter(User.role == RoleEnum.DOCTOR).all()
+
+    doctors = [
+        DoctorRead(
+            id=u.id,
+            name=u.name,
+            specialty=u.specialization,
+            email=u.email,
+            hospital=u.hospital,
+            years_experience=int(u.years_experience) if u.years_experience is not None else None,
+            registration_number=u.medical_license,
+            verified=bool(u.is_verified),
+        )
+        for u in users
+    ]
+
     if not query:
-        return DOCTORS
+        return doctors
 
     return [
         doctor
-        for doctor in DOCTORS
+        for doctor in doctors
         if query in (doctor.name or "").lower()
         or query in (doctor.specialty or "").lower()
         or query in (doctor.email or "").lower()
@@ -27,25 +44,47 @@ def list_doctors(search: str | None = None):
 
 
 @router.get("/{doctor_id}", response_model=DoctorRead)
-def get_doctor(doctor_id: int):
-    for doctor in DOCTORS:
-        if doctor.id == doctor_id:
-            return doctor
+def get_doctor(doctor_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == doctor_id, User.role == RoleEnum.DOCTOR).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Doctor not found")
 
-    raise HTTPException(status_code=404, detail="Doctor not found")
+    return DoctorRead(
+        id=user.id,
+        name=user.name,
+        specialty=user.specialization,
+        email=user.email,
+        hospital=user.hospital,
+        years_experience=int(user.years_experience) if user.years_experience is not None else None,
+        registration_number=user.medical_license,
+        verified=bool(user.is_verified),
+    )
 
 
 @router.post("/", response_model=DoctorRead)
-def create_doctor(payload: DoctorCreate):
-    doctor = DoctorRead(
-        id=len(DOCTORS) + 1,
+def create_doctor(payload: DoctorCreate, db: Session = Depends(get_db)):
+    user = User(
         name=payload.name,
-        specialty=payload.specialty,
+        specialization=payload.specialty,
         email=payload.email,
-        hospital=getattr(payload, "hospital", "Pending verification"),
-        years_experience=getattr(payload, "years_experience", 0),
-        registration_number=payload.registration_number,
-        verified=getattr(payload, "verified", False),
+        hospital=payload.hospital,
+        years_experience=payload.years_experience,
+        medical_license=payload.registration_number,
+        is_verified=payload.verified,
+        role=RoleEnum.DOCTOR,
+        hashed_password="",
     )
-    DOCTORS.append(doctor)
-    return doctor
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return DoctorRead(
+        id=user.id,
+        name=user.name,
+        specialty=user.specialization,
+        email=user.email,
+        hospital=user.hospital,
+        years_experience=int(user.years_experience) if user.years_experience is not None else None,
+        registration_number=user.medical_license,
+        verified=bool(user.is_verified),
+    )

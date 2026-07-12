@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Float, Enum as SQLEnum
+from sqlalchemy.orm import relationship
 
 from app.core.database import Base
 import enum
@@ -9,7 +10,7 @@ import enum
 class RoleEnum(str, enum.Enum):
     DOCTOR = "doctor"
     PATIENT = "patient"
-    ADMIN = "admin"
+    RETIRED_POLICE = "retired_police"
 
 
 class User(Base):
@@ -44,4 +45,16 @@ class User(Base):
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    doctor_profile = relationship("DoctorProfile", back_populates="user", uselist=False)
+    patient_profile = relationship("PatientProfile", back_populates="user", uselist=False)
+    retired_police_profile = relationship("RetiredPoliceProfile", back_populates="user", uselist=False)
+    posts = relationship("Post", back_populates="author", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="user", cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    reviews = relationship("Review", back_populates="reviewer", cascade="all, delete-orphan")
+    complaints_submitted = relationship("Complaint", foreign_keys="Complaint.submitted_by", back_populates="submitted_by_user", cascade="all, delete-orphan")
+    complaints_against = relationship("Complaint", foreign_keys="Complaint.against_user", back_populates="against_user_obj", cascade="all, delete-orphan")
+    followers = relationship("Follow", foreign_keys="Follow.following_id", back_populates="following", cascade="all, delete-orphan")
+    following = relationship("Follow", foreign_keys="Follow.follower_id", back_populates="follower", cascade="all, delete-orphan")
 

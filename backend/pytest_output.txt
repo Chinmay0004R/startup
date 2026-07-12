@@ -1,0 +1,185 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+______________ SafetyNetworkAPITests.test_list_doctors_endpoint _______________
+
+self = <test_api.SafetyNetworkAPITests testMethod=test_list_doctors_endpoint>
+
+    def test_list_doctors_endpoint(self):
+>       response = self.client.get("/api/v1/doctors/")
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_api.py:14: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+..\..\.venv\Lib\site-packages\starlette\testclient.py:482: in get
+    return super().get(
+..\..\.venv\Lib\site-packages\httpx2\_client.py:1055: in get
+    return self.request(
+..\..\.venv\Lib\site-packages\starlette\testclient.py:454: in request
+    return super().request(
+..\..\.venv\Lib\site-packages\httpx2\_client.py:795: in request
+    return self.send(request, auth=auth, follow_redirects=follow_redirects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\.venv\Lib\site-packages\httpx2\_client.py:922: in send
+    response = self._send_handling_auth(
+..\..\.venv\Lib\site-packages\httpx2\_client.py:950: in _send_handling_auth
+    response = self._send_handling_redirects(
+..\..\.venv\Lib\site-packages\httpx2\_client.py:985: in _send_handling_redirects
+    response = self._send_single_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\.venv\Lib\site-packages\httpx2\_client.py:1018: in _send_single_request
+    response = transport.handle_request(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\.venv\Lib\site-packages\starlette\testclient.py:356: in handle_request
+    raise exc
+..\..\.venv\Lib\site-packages\starlette\testclient.py:353: in handle_request
+    portal.call(self.app, scope, receive, send)
+..\..\.venv\Lib\site-packages\anyio\from_thread.py:338: in call
+    return cast(T_Retval, self.start_task_soon(func, *args).result())
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\concurrent\futures\_base.py:450: in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+C:\Python314\Lib\concurrent\futures\_base.py:395: in __get_result
+    raise self._exception
+..\..\.venv\Lib\site-packages\anyio\from_thread.py:263: in _call_func
+    retval = await retval_or_awaitable
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\.venv\Lib\site-packages\fastapi\applications.py:1163: in __call__
+    await super().__call__(scope, receive, send)
+..\..\.venv\Lib\site-packages\starlette\applications.py:90: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\.venv\Lib\site-packages\starlette\middleware\errors.py:186: in __call__
+    raise exc
+..\..\.venv\Lib\site-packages\starlette\middleware\errors.py:164: in __call__
+    await self.app(scope, receive, _send)
+..\..\.venv\Lib\site-packages\starlette\middleware\cors.py:88: in __call__
+    await self.app(scope, receive, send)
+..\..\.venv\Lib\site-packages\starlette\middleware\exceptions.py:63: in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+..\..\.venv\Lib\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+..\..\.venv\Lib\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+..\..\.venv\Lib\site-packages\fastapi\middleware\asyncexitstack.py:18: in __call__
+    await self.app(scope, receive, send)
+..\..\.venv\Lib\site-packages\starlette\routing.py:660: in __call__
+    await self.middleware_stack(scope, receive, send)
+..\..\.venv\Lib\site-packages\fastapi\routing.py:2683: in app
+    await route.handle(scope, receive, send)
+..\..\.venv\Lib\site-packages\fastapi\routing.py:1753: in handle
+    await self.original_router.handle(scope, receive, send)
+..\..\.venv\Lib\site-packages\fastapi\routing.py:2738: in handle
+    await included_router._handle_selected(scope, receive, send)
+..\..\.venv\Lib\site-packages\fastapi\routing.py:1764: in _handle_selected
+    await route.handle(scope, receive, send)
+..\..\.venv\Lib\site-packages\fastapi\routing.py:1753: in handle
+    await self.original_router.handle(scope, receive, send)
+..\..\.venv\Lib\site-packages\fastapi\routing.py:2738: in handle
+    await included_router._handle_selected(scope, receive, send)
+..\..\.venv\Lib\site-packages\fastapi\routing.py:1773: in _handle_selected
+    await original_route.handle(scope, receive, send)
+..\..\.venv\Lib\site-packages\fastapi\routing.py:1264: in handle
+    await app(scope, receive, send)
+..\..\.venv\Lib\site-packages\fastapi\routing.py:150: in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+..\..\.venv\Lib\site-packages\starlette\_exception_handler.py:53: in wrapped_app
+    raise exc
+..\..\.venv\Lib\site-packages\starlette\_exception_handler.py:42: in wrapped_app
+    await app(scope, receive, sender)
+..\..\.venv\Lib\site-packages\fastapi\routing.py:136: in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+..\..\.venv\Lib\site-packages\fastapi\routing.py:690: in app
+    raw_response = await run_endpoint_function(
+..\..\.venv\Lib\site-packages\fastapi\routing.py:346: in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\.venv\Lib\site-packages\starlette\concurrency.py:34: in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\.venv\Lib\site-packages\anyio\to_thread.py:63: in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+..\..\.venv\Lib\site-packages\anyio\_backends\_asyncio.py:2596: in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+..\..\.venv\Lib\site-packages\anyio\_backends\_asyncio.py:1029: in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+search = None
+db = <sqlalchemy.orm.session.Session object at 0x000002A9D057EFD0>
+
+    @router.get("/", response_model=List[DoctorRead])
+    def list_doctors(search: str | None = None, db: Session = Depends(get_db)):
+        query = (search or "").strip().lower()
+        users = db.query(User).filter(User.role == RoleEnum.DOCTOR).all()
+    
+        doctors = [
+>           DoctorRead(
+                id=u.id,
+                name=u.name,
+                specialty=u.specialization,
+                email=u.email,
+                hospital=u.hospital,
+                years_experience=int(u.years_experience) if u.years_experience is not None else None,
+                registration_number=u.medical_license,
+                verified=bool(u.is_verified),
+            )
+            for u in users
+        ]
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for DoctorRead
+E       specialty
+E         Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]
+E           For further information visit https://errors.pydantic.dev/2.13/v/string_type
+
+app\api\v1\doctors.py:19: ValidationError
+============================== warnings summary ===============================
+app\schemas\auth.py:33
+  D:\hospital_management\startup\backend\app\schemas\auth.py:33: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class UserResponse(BaseModel):
+
+app\schemas\doctor.py:18
+  D:\hospital_management\startup\backend\app\schemas\doctor.py:18: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DoctorRead(DoctorBase):
+
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+  D:\hospital_management\.venv\Lib\site-packages\pydantic\_internal\_config.py:386: UserWarning: Valid config keys have changed in V2:
+  * 'orm_mode' has been renamed to 'from_attributes'
+    warnings.warn(message, UserWarning)
+
+app\schemas\post.py:15
+  D:\hospital_management\startup\backend\app\schemas\post.py:15: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PostRead(PostBase):
+
+app\schemas\user.py:26
+  D:\hospital_management\startup\backend\app\schemas\user.py:26: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class UserRead(UserBase):
+
+app\schemas\doctor_profile.py:15
+  D:\hospital_management\startup\backend\app\schemas\doctor_profile.py:15: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DoctorProfileRead(BaseModel):
+
+app\schemas\review.py:17
+  D:\hospital_management\startup\backend\app\schemas\review.py:17: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ReviewRead(BaseModel):
+
+app\schemas\follow.py:11
+  D:\hospital_management\startup\backend\app\schemas\follow.py:11: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FollowRead(BaseModel):
+
+app\schemas\notification.py:12
+  D:\hospital_management\startup\backend\app\schemas\notification.py:12: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NotificationRead(BaseModel):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_api.py::SafetyNetworkAPITests::test_list_doctors_endpoint
+1 failed, 15 warnings in 4.42s
+

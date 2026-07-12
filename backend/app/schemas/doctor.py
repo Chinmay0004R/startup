@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr
 
 class DoctorBase(BaseModel):
     name: str
-    specialty: str
+    specialty: str | None = None
     email: EmailStr
     hospital: str | None = None
     years_experience: int | None = None
@@ -18,5 +18,6 @@ class DoctorCreate(DoctorBase):
 class DoctorRead(DoctorBase):
     id: int
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True,
+    }

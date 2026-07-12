@@ -1,0 +1,57 @@
+..........                                                               [100%]
+============================== warnings summary ===============================
+app\schemas\auth.py:33
+  D:\hospital_management\startup\backend\app\schemas\auth.py:33: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class UserResponse(BaseModel):
+
+app\schemas\post.py:15
+  D:\hospital_management\startup\backend\app\schemas\post.py:15: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PostRead(PostBase):
+
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+..\..\.venv\Lib\site-packages\pydantic\_internal\_config.py:386
+  D:\hospital_management\.venv\Lib\site-packages\pydantic\_internal\_config.py:386: UserWarning: Valid config keys have changed in V2:
+  * 'orm_mode' has been renamed to 'from_attributes'
+    warnings.warn(message, UserWarning)
+
+app\schemas\user.py:26
+  D:\hospital_management\startup\backend\app\schemas\user.py:26: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class UserRead(UserBase):
+
+app\schemas\doctor_profile.py:15
+  D:\hospital_management\startup\backend\app\schemas\doctor_profile.py:15: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DoctorProfileRead(BaseModel):
+
+app\schemas\review.py:17
+  D:\hospital_management\startup\backend\app\schemas\review.py:17: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ReviewRead(BaseModel):
+
+app\schemas\follow.py:11
+  D:\hospital_management\startup\backend\app\schemas\follow.py:11: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FollowRead(BaseModel):
+
+app\schemas\notification.py:12
+  D:\hospital_management\startup\backend\app\schemas\notification.py:12: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NotificationRead(BaseModel):
+
+tests/test_api.py::SafetyNetworkAPITests::test_complaint_endpoint
+tests/test_api.py::SafetyNetworkAPITests::test_create_post_endpoint
+tests/test_api.py::SafetyNetworkAPITests::test_emergency_alert_endpoint
+tests/test_api.py::SafetyNetworkAPITests::test_google_login_flow
+tests/test_api.py::SafetyNetworkAPITests::test_like_post_endpoint
+tests/test_api.py::SafetyNetworkAPITests::test_list_posts_endpoint
+tests/test_api.py::SafetyNetworkAPITests::test_register_verify_and_login_flow
+  D:\hospital_management\startup\backend\app\core\security.py:44: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    expire = datetime.utcnow() + timedelta(hours=settings.JWT_EXPIRATION_HOURS)
+
+tests/test_api.py: 13 warnings
+  D:\hospital_management\.venv\Lib\site-packages\sqlalchemy\sql\schema.py:3623: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return util.wrap_callable(lambda ctx: fn(), fn)  # type: ignore
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+10 passed, 33 warnings in 6.69s
+

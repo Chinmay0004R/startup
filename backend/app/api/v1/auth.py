@@ -11,6 +11,7 @@ from typing import Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Depends, status
 from fastapi.security import HTTPBearer
+from sqlalchemy.orm import Session
 
 from ...core.config import settings
 from ...core.security import get_password_hash, verify_password, create_access_token, verify_token
@@ -22,54 +23,42 @@ from ...schemas.auth import (
     LoginResponse,
     UserResponse,
 )
+from app.core.database import get_db, SessionLocal
+from app.models.user import User, RoleEnum
+from app.models.email_verification import EmailVerification
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
 
-# In-memory storage (replace with database in production)
-users_db: Dict[str, dict] = {}
-verification_db: Dict[str, dict] = {}
 
-
-# Seed test users for development/testing
+# Seed test users for development/testing into the database (no-op if already present)
 def _seed_test_users():
-    """Seed test users for development"""
-    test_users = {
-        "testdoctor@example.com": {
-            "name": "Dr. Test Doctor",
-            "email": "testdoctor@example.com",
-            "role": "doctor",
-            "hashed_password": get_password_hash("password123"),
-            "is_verified": True,
-            "profile_image": None,
-            "bio": None,
-            "city": None,
-            "specialization": None,
-            "hospital": None,
-            "followers_count": 0,
-            "following_count": 0,
-            "posts_count": 0,
-            "created_at": datetime.utcnow().isoformat(),
-        },
-        "testpatient@example.com": {
-            "name": "John Patient",
-            "email": "testpatient@example.com",
-            "role": "patient",
-            "hashed_password": get_password_hash("password123"),
-            "is_verified": True,
-            "profile_image": None,
-            "bio": None,
-            "city": None,
-            "specialization": None,
-            "hospital": None,
-            "followers_count": 0,
-            "following_count": 0,
-            "posts_count": 0,
-            "created_at": datetime.utcnow().isoformat(),
-        }
-    }
-    users_db.update(test_users)
-    print("✓ Test users seeded:", list(test_users.keys()))
+    db = SessionLocal()
+    try:
+        if not db.query(User).filter(User.email == "testdoctor@example.com").first():
+            u = User(
+                name="Dr. Test Doctor",
+                email="testdoctor@example.com",
+                role=RoleEnum.DOCTOR,
+                hashed_password=get_password_hash("password123"),
+                is_verified=True,
+            )
+            db.add(u)
+
+        if not db.query(User).filter(User.email == "testpatient@example.com").first():
+            u2 = User(
+                name="John Patient",
+                email="testpatient@example.com",
+                role=RoleEnum.PATIENT,
+                hashed_password=get_password_hash("password123"),
+                is_verified=True,
+            )
+            db.add(u2)
+
+        db.commit()
+        print("✓ Test users seeded (db)")
+    finally:
+        db.close()
 
 
 _seed_test_users()
@@ -141,40 +130,36 @@ def get_current_user(credentials = Depends(security)) -> dict:
 
 
 @router.post("/register", response_model=dict)
-def register(payload: RegisterRequest):
+def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     """Register a new user"""
     email = str(payload.email).lower().strip()
 
     if not is_valid_email(email):
         raise HTTPException(status_code=400, detail="Invalid email format")
 
-    if email in users_db:
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=400, detail="Email already registered")
 
     if len(payload.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
 
     otp = f"{random.randint(100000, 999999)}"
-    users_db[email] = {
-        "name": payload.name,
-        "email": email,
-        "role": payload.role.value,
-        "hashed_password": get_password_hash(payload.password),
-        "is_verified": False,
-        "profile_image": None,
-        "bio": None,
-        "city": None,
-        "specialization": None,
-        "hospital": None,
-        "followers_count": 0,
-        "following_count": 0,
-        "posts_count": 0,
-        "created_at": datetime.utcnow().isoformat(),
-    }
-    verification_db[email] = {
-        "otp": otp,
-        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10),
-    }
+    user = User(
+        name=payload.name,
+        email=email,
+        role=RoleEnum(payload.role.value),
+        hashed_password=get_password_hash(payload.password),
+        is_verified=False,
+    )
+    db.add(user)
+
+    verification = EmailVerification(
+        email=email,
+        otp=otp,
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=10),
+    )
+    db.add(verification)
+    db.commit()
 
     try:
         send_verification_email(email, otp)
@@ -188,30 +173,36 @@ def register(payload: RegisterRequest):
 
 
 @router.post("/verify", response_model=dict)
-def verify(payload: VerifyRequest):
+def verify(payload: VerifyRequest, db: Session = Depends(get_db)):
     """Verify email with OTP"""
     email = str(payload.email).lower().strip()
-    record = verification_db.get(email)
+    record = db.query(EmailVerification).filter(EmailVerification.email == email).first()
 
     if not record:
         raise HTTPException(status_code=400, detail="No verification request found")
 
-    if datetime.now(timezone.utc) > record["expires_at"]:
+    current_time = datetime.now(timezone.utc)
+    expires_at = record.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if current_time > expires_at:
         raise HTTPException(status_code=400, detail="Verification code expired")
 
-    if record["otp"] != payload.otp:
+    if record.otp != payload.otp:
         raise HTTPException(status_code=400, detail="Invalid verification code")
 
-    user = users_db.get(email)
+    user = db.query(User).filter(User.email == email).first()
     if user:
-        user["is_verified"] = True
-        del verification_db[email]
+        user.is_verified = True
+        db.delete(record)
+        db.commit()
 
     return {"message": "Email verified successfully"}
 
 
 @router.post("/google-login", response_model=LoginResponse)
-def google_login(payload: GoogleLoginRequest):
+def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
     """Authenticate with a Google ID token and issue a JWT token."""
     google_user = _validate_google_token(payload.credential)
     email = str(google_user.get("email", "")).lower().strip()
@@ -219,46 +210,41 @@ def google_login(payload: GoogleLoginRequest):
     if not email:
         raise HTTPException(status_code=400, detail="Google account email is required")
 
-    user = users_db.get(email)
+    user = db.query(User).filter(User.email == email).first()
     if not user:
-        users_db[email] = {
-            "name": google_user.get("name") or email.split("@", 1)[0],
-            "email": email,
-            "role": "patient",
-            "hashed_password": get_password_hash(f"google-oauth:{email}"),
-            "is_verified": True,
-            "profile_image": google_user.get("picture"),
-            "bio": None,
-            "city": None,
-            "specialization": None,
-            "hospital": None,
-            "followers_count": 0,
-            "following_count": 0,
-            "posts_count": 0,
-            "created_at": datetime.utcnow().isoformat(),
-        }
-        user = users_db[email]
+        user = User(
+            name=google_user.get("name") or email.split("@", 1)[0],
+            email=email,
+            role=RoleEnum.PATIENT,
+            hashed_password=get_password_hash(f"google-oauth:{email}"),
+            is_verified=True,
+            profile_image=google_user.get("picture"),
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
     else:
-        user["is_verified"] = True
-        user["profile_image"] = google_user.get("picture") or user.get("profile_image")
-        if not user.get("name"):
-            user["name"] = google_user.get("name") or email.split("@", 1)[0]
+        user.is_verified = True
+        user.profile_image = google_user.get("picture") or user.profile_image
+        if not user.name:
+            user.name = google_user.get("name") or email.split("@", 1)[0]
+        db.commit()
 
-    access_token = create_access_token(data={"email": user["email"], "role": user["role"]})
+    access_token = create_access_token(data={"email": user.email, "role": user.role.value})
     user_response = UserResponse(
-        id=hash(email) % (10 ** 8),
-        name=user["name"],
-        email=user["email"],
-        role=user["role"],
-        profile_image=user.get("profile_image"),
-        bio=user.get("bio"),
-        city=user.get("city"),
-        specialization=user.get("specialization"),
-        hospital=user.get("hospital"),
-        followers_count=user.get("followers_count", 0),
-        following_count=user.get("following_count", 0),
-        posts_count=user.get("posts_count", 0),
-        is_verified=user.get("is_verified", False),
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        role=user.role.value,
+        profile_image=user.profile_image,
+        bio=user.bio,
+        city=user.city,
+        specialization=user.specialization,
+        hospital=user.hospital,
+        followers_count=user.followers_count or 0,
+        following_count=user.following_count or 0,
+        posts_count=user.posts_count or 0,
+        is_verified=user.is_verified or False,
     )
 
     return LoginResponse(
@@ -270,39 +256,38 @@ def google_login(payload: GoogleLoginRequest):
 
 
 @router.post("/login", response_model=LoginResponse)
-def login(payload: LoginRequest):
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
     """Login user and return JWT token"""
     email = str(payload.email).lower().strip()
-    user = users_db.get(email)
+    user = db.query(User).filter(User.email == email).first()
 
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    if not user.get("is_verified"):
+    if not user.is_verified:
         raise HTTPException(status_code=403, detail="Email not verified. Please verify your email first.")
 
-    if not verify_password(payload.password, user["hashed_password"]):
+    if not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Create JWT token
     access_token = create_access_token(
-        data={"email": user["email"], "role": user["role"]}
+        data={"email": user.email, "role": user.role.value}
     )
 
     user_response = UserResponse(
-        id=hash(email) % (10 ** 8),  # Simple ID generation for now
-        name=user["name"],
-        email=user["email"],
-        role=user["role"],
-        profile_image=user.get("profile_image"),
-        bio=user.get("bio"),
-        city=user.get("city"),
-        specialization=user.get("specialization"),
-        hospital=user.get("hospital"),
-        followers_count=user.get("followers_count", 0),
-        following_count=user.get("following_count", 0),
-        posts_count=user.get("posts_count", 0),
-        is_verified=user.get("is_verified", False),
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        role=user.role.value,
+        profile_image=user.profile_image,
+        bio=user.bio,
+        city=user.city,
+        specialization=user.specialization,
+        hospital=user.hospital,
+        followers_count=user.followers_count or 0,
+        following_count=user.following_count or 0,
+        posts_count=user.posts_count or 0,
+        is_verified=user.is_verified or False,
     )
 
     return LoginResponse(
@@ -314,27 +299,27 @@ def login(payload: LoginRequest):
 
 
 @router.get("/me", response_model=UserResponse)
-def get_current_user_info(current_user: dict = Depends(get_current_user)):
+def get_current_user_info(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get current user profile"""
     email = current_user.get("email")
-    user = users_db.get(email)
+    user = db.query(User).filter(User.email == email).first()
 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
     return UserResponse(
-        id=hash(email) % (10 ** 8),
-        name=user["name"],
-        email=user["email"],
-        role=user["role"],
-        profile_image=user.get("profile_image"),
-        bio=user.get("bio"),
-        city=user.get("city"),
-        specialization=user.get("specialization"),
-        hospital=user.get("hospital"),
-        followers_count=user.get("followers_count", 0),
-        following_count=user.get("following_count", 0),
-        posts_count=user.get("posts_count", 0),
-        is_verified=user.get("is_verified", False),
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        role=user.role.value,
+        profile_image=user.profile_image,
+        bio=user.bio,
+        city=user.city,
+        specialization=user.specialization,
+        hospital=user.hospital,
+        followers_count=user.followers_count or 0,
+        following_count=user.following_count or 0,
+        posts_count=user.posts_count or 0,
+        is_verified=user.is_verified or False,
     )
 
