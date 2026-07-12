@@ -239,7 +239,7 @@ const Home = ({ health }) => {
               Verified care for doctors,<br />users, and communities
             </h2>
             <p style={heroDescriptionStyle}>
-              Connect with verified medical professionals, request emergency support, and report misconduct safely through one trusted platform.
+              Connect with verified medical professionals, request emergency assistance, and report misconduct safely through one trusted platform.
             </p>
             <div style={featureBadgesStyle}>
               <div style={featureBadgeStyle('16, 185, 129')}>
@@ -248,7 +248,7 @@ const Home = ({ health }) => {
               </div>
               <div style={featureBadgeStyle('251, 146, 60')}>
                 <FaPhone style={{ fontSize: '0.875rem' }} />
-                SOS support network
+                SOS response network
               </div>
               <div style={featureBadgeStyle('147, 51, 234')}>
                 <FaExclamationTriangle style={{ fontSize: '0.875rem' }} />
@@ -286,7 +286,7 @@ const Home = ({ health }) => {
                 <FaPhone />
               </div>
               <h3 style={featureTitleStyle}>Emergency Response</h3>
-              <p style={featureDescriptionStyle}>Doctors can trigger an SOS alert and receive rapid support from retired police officers and local authorities.</p>
+              <p style={featureDescriptionStyle}>Doctors can trigger an SOS alert and receive rapid response from retired police officers and local authorities.</p>
             </div>
             <div style={featureCardStyle()}>
               <div style={iconBoxStyle('147, 51, 234')}>

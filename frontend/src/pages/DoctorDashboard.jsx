@@ -246,7 +246,7 @@ const DoctorDashboard = ({ currentEmail }) => {
                 <FaExclamationTriangle style={{ color: '#f97316' }} />
               </div>
               <p style={{ color: '#cbd5e1', marginBottom: '1rem' }}>
-                Use this button to notify safety support immediately.
+                Use this button to notify your safety network immediately.
               </p>
               <button
                 type="button"

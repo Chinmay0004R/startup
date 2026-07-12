@@ -76,6 +76,22 @@ const Dashboard = ({ currentRole, currentUserEmail, authToken, onLogout }) => {
     }, 500);
   };
 
+  const handleEditProfile = () => {
+    if (currentRole === 'doctor') {
+      navigate('/doctor-setup');
+    } else {
+      navigate('/user-profile');
+    }
+  };
+
+  const handleViewProfile = () => {
+    if (currentRole === 'doctor') {
+      navigate('/doctors');
+    } else {
+      navigate('/user-profile');
+    }
+  };
+
   const dashboardStyle = {
     display: 'grid',
     gridTemplateColumns: '300px 1fr 320px',
@@ -330,8 +346,8 @@ const Dashboard = ({ currentRole, currentUserEmail, authToken, onLogout }) => {
               </div>
             </div>
 
-            <button style={buttonStyle}>Edit Profile</button>
-            <button style={{...buttonStyle, background: '#e2e8f0', color: '#4a5568', marginTop: '0.5rem'}}>
+            <button style={buttonStyle} onClick={handleEditProfile}>Edit Profile</button>
+            <button style={{...buttonStyle, background: '#e2e8f0', color: '#4a5568', marginTop: '0.5rem'}} onClick={handleViewProfile}>
               View Profile
             </button>
           </div>

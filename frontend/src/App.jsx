@@ -6,7 +6,6 @@ import Doctors from './pages/Doctors';
 import DoctorDashboard from './pages/DoctorDashboard';
 import DoctorProfile from './pages/DoctorProfile';
 import UserProfile from './pages/PatientProfile';
-import Support from './pages/Support';
 import Login from './pages/LoginNew';
 import RoleSetup from './pages/RoleSetup';
 import DoctorSetup from './pages/DoctorSetup';
@@ -186,18 +185,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route
-            path="/support"
-            element={
-              <ProtectedRoute authToken={authToken} currentRole={currentRole} allowedRole="patient">
-                <Support 
-                  authToken={authToken}
-                  onLogout={handleLogout}
-                />
-              </ProtectedRoute>
-            }
-          />
-
           {/* 404 Not Found */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

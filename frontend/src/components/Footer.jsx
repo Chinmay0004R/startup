@@ -183,9 +183,6 @@ const Footer = () => {
               <li style={liStyle}>
                 <FooterLink href="/doctors">Find Doctors</FooterLink>
               </li>
-              <li style={liStyle}>
-                <FooterLink href="/support">Support</FooterLink>
-              </li>
             </ul>
           </div>
 
@@ -229,7 +226,7 @@ const Footer = () => {
               © {currentYear} DoctorTrust Network. Made with{' '}
               <FaHeart style={{ color: '#ef4444', fontSize: '0.75rem' }} /> for healthcare professionals.
             </p>
-            <p style={footerBadgeStyle}>Safety • Verification • Support</p>
+            <p style={footerBadgeStyle}>Safety • Verification • Response</p>
             <div className="dev-credit" style={{ marginTop: '0.5rem' }}>
               Made with ♥ by <a href="https://github.com/Chinmay0004R" target="_blank" rel="noopener noreferrer" aria-label="Chinmay Murkar GitHub" style={{ color: '#94a3b8', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style={{ verticalAlign: 'middle', marginRight: '6px' }}>

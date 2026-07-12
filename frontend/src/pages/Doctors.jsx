@@ -261,7 +261,7 @@ const Doctors = () => {
             <FaUserMd style={{ fontSize: '2rem', color: '#60a5fa' }} />
           </div>
           <p style={headerDescriptionStyle}>
-            Update your doctor profile, connect with other doctors, publish updates, and trigger emergency support when needed.
+            Update your doctor profile, connect with other doctors, publish updates, and trigger emergency alerts when needed.
           </p>
         </section>
 
@@ -442,7 +442,7 @@ const Doctors = () => {
                 <FaExclamationTriangle style={{ color: '#f97316' }} />
               </div>
               <p style={{ color: '#cbd5e1', marginBottom: '1rem' }}>
-                Send an emergency alert to your safety network and local support team.
+                Send an emergency alert to your safety network and local response team.
               </p>
               <button
                 type="button"
