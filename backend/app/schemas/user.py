@@ -3,7 +3,7 @@ from typing import Optional
 
 
 class UserBase(BaseModel):
-    username: str
+    name: str
     email: EmailStr
 
 
@@ -12,7 +12,7 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    username: Optional[str] = None
+    name: Optional[str] = None
     email: Optional[EmailStr] = None
     profile_image: Optional[str] = None
     bio: Optional[str] = None

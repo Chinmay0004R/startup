@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import { fetchDoctorById, fetchPosts, likePost, createSafetyAlert } from '../services/api';
+import { fetchDoctorById, fetchFollowers, fetchPosts, likePost, createSafetyAlert, uploadUserProfileImage } from '../services/api';
 import {
   FaUserMd,
   FaHeart,
@@ -37,6 +37,9 @@ const DoctorProfile = () => {
   const [emergencyStatus, setEmergencyStatus] = useState('');
   const [isFollowing, setIsFollowing] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState('');
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [toast, setToast] = useState({ message: '', type: '' });
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -88,6 +91,42 @@ const DoctorProfile = () => {
     setIsFollowing((current) => !current);
   };
 
+  const handleProfileImageChange = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setToast({ message: 'Unsupported image format. Use jpg, jpeg, png, or webp.', type: 'error' });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setToast({ message: 'Image must be 10 MB or smaller.', type: 'error' });
+      return;
+    }
+
+    const token = localStorage.getItem('authToken');
+    const formData = new FormData();
+    formData.append('file', file);
+
+    setUploadStatus('Uploading profile image...');
+    setUploadProgress(0);
+    setToast({ message: '', type: '' });
+
+    try {
+      const updatedDoctor = await uploadUserProfileImage(formData, token, setUploadProgress);
+      setDoctor((current) => ({ ...current, profile_image: updatedDoctor?.profile_image || current.profile_image }));
+      setUploadStatus('Upload complete.');
+      setToast({ message: 'Profile image uploaded successfully.', type: 'success' });
+    } catch (error) {
+      setUploadStatus('Upload failed.');
+      setToast({ message: error.message || 'Profile upload failed.', type: 'error' });
+    } finally {
+      setTimeout(() => setUploadProgress(0), 1500);
+    }
+  };
+
   if (!doctor) {
     return (
       <div>
@@ -131,12 +170,23 @@ const DoctorProfile = () => {
     },
   ];
 
-  const followList = doctor?.followers || [
-    { id: 1, name: 'Dr. Amit', role: 'Cardiologist' },
-    { id: 2, name: 'Sneha Patil', role: 'Patient' },
-    { id: 3, name: 'Dr. Rakesh', role: 'Neurologist' },
-    { id: 4, name: 'Rahul', role: 'Parent' },
-  ];
+  const followList = doctor?.followers || [];
+
+  // load followers when doctor changes
+  useEffect(() => {
+    let mounted = true;
+    const loadFollowers = async () => {
+      try {
+        const token = localStorage.getItem('authToken');
+        const users = await fetchFollowers(doctor?.user_id || doctor?.id, token);
+        if (mounted) setDoctor((d) => ({ ...d, followers: users }));
+      } catch (e) {
+        // ignore
+      }
+    };
+    if (doctor) loadFollowers();
+    return () => { mounted = false; };
+  }, [doctor]);
 
   const certs = doctor?.certifications || [
     { id: 1, name: 'MBBS', issuer: 'Mumbai University', status: 'Verified' },
@@ -162,16 +212,9 @@ const DoctorProfile = () => {
 
   const skillsList = doctor?.skills || ['Cardiology', 'Angioplasty', 'Heart Failure', 'ECG Interpretation'];
 
-  const verificationTimeline = doctor?.verification_timeline || [
-    { id: 1, event: 'Medical License Verified', date: '2021-06-12', status: 'Verified' },
-    { id: 2, event: 'Hospital Affiliation Verified', date: '2022-03-01', status: 'Verified' },
-    { id: 3, event: 'Degree Verified', date: '2020-11-20', status: 'Verified' },
-  ];
+  const verificationTimeline = doctor?.verification_timeline || [];
 
-  const peerReviews = doctor?.peer_reviews || [
-    { id: 1, reviewer: 'Dr. Sharma', content: 'Excellent clinical judgement and clear communicator.', date: '2024-02-10' },
-    { id: 2, reviewer: 'Dr. Kapoor', content: 'Collaborative and reliable in high-pressure situations.', date: '2023-08-22' },
-  ];
+  const peerReviews = doctor?.peer_reviews || [];
 
   const publications = doctor?.publications || [
     { id: 1, title: 'Heart Disease in Young Adults', journal: 'Indian Journal of Cardiology', year: '2022' },
@@ -220,13 +263,39 @@ const DoctorProfile = () => {
             <div style={heroInnerStyle}>
               <div style={heroLeftStyle}>
                 <div style={profilePhotoStyle}>
-                  <FaUserMd style={profileIconStyle} />
+                    {doctor.profile_image ? (
+                      <img src={doctor.profile_image} alt="Doctor profile" style={heroImageStyle} />
+                    ) : (
+                      <FaUserMd style={profileIconStyle} />
+                    )}
                 </div>
                 <div>
                   <div style={heroTitleRowStyle}>
                     <h1 style={heroNameStyle}>{doctor.name}</h1>
                     {doctor.verified && <FaCheckCircle style={verifiedIconStyle} />}
                   </div>
+                  {isOwner && (
+                    <label style={uploadLabelStyle}>
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        onChange={handleProfileImageChange}
+                        style={{ display: 'none' }}
+                      />
+                      <span style={uploadButtonStyle}>Change profile image</span>
+                    </label>
+                  )}
+                  {uploadStatus && <p style={uploadStatusStyle}>{uploadStatus}</p>}
+                  {uploadProgress > 0 && uploadProgress < 100 && (
+                    <div style={progressBarWrapperStyle}>
+                      <div style={{ ...progressBarStyle, width: `${uploadProgress}%` }} />
+                    </div>
+                  )}
+                  {toast.message && (
+                    <div style={{ ...toastStyle, background: toast.type === 'success' ? '#d1fae5' : '#fee2e2', color: toast.type === 'success' ? '#065f46' : '#991b1b' }}>
+                      {toast.message}
+                    </div>
+                  )}
                   <p style={heroMetaStyle}>{doctor.qualifications || 'MBBS | MD'} · {doctor.specialty || 'Specialist'}</p>
                   <p style={heroMetaStyle}>{doctor.hospital || 'Apollo Hospital'} • {doctor.city || 'Mumbai'}</p>
                   <div style={heroStatsRowStyle}>
@@ -537,6 +606,55 @@ const profilePhotoStyle = {
   alignItems: 'center',
   justifyContent: 'center',
   boxShadow: '0 18px 35px rgba(15,23,42,0.25)',
+  overflow: 'hidden',
+};
+
+const heroImageStyle = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'cover',
+};
+
+const uploadLabelStyle = {
+  display: 'inline-flex',
+  marginTop: '0.75rem',
+  cursor: 'pointer',
+};
+
+const uploadButtonStyle = {
+  padding: '0.6rem 1rem',
+  borderRadius: '9999px',
+  background: '#2563eb',
+  color: 'white',
+  fontSize: '0.9rem',
+  fontWeight: 600,
+};
+
+const uploadStatusStyle = {
+  color: '#cbd5e1',
+  marginTop: '0.75rem',
+  fontSize: '0.95rem',
+};
+
+const progressBarWrapperStyle = {
+  width: '100%',
+  height: '8px',
+  borderRadius: '9999px',
+  background: '#334155',
+  marginTop: '0.75rem',
+};
+
+const progressBarStyle = {
+  height: '100%',
+  borderRadius: '9999px',
+  background: 'linear-gradient(135deg, #38bdf8, #2563eb)',
+};
+
+const toastStyle = {
+  padding: '0.85rem 1rem',
+  borderRadius: '1rem',
+  marginTop: '1rem',
+  fontSize: '0.95rem',
 };
 
 const profileIconStyle = {

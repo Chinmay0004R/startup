@@ -9,6 +9,7 @@ import {
   createPost,
   likePost,
   createSafetyAlert,
+  createFollow,
 } from '../services/api';
 import {
   FaUserMd,
@@ -37,8 +38,12 @@ const Doctors = () => {
   });
   const [posts, setPosts] = useState([]);
   const [postContent, setPostContent] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [connectedDoctorIds, setConnectedDoctorIds] = useState([]);
   const [status, setStatus] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
+  const [isConnectingDoctor, setIsConnectingDoctor] = useState(null);
   const [isPosting, setIsPosting] = useState(false);
   const [isEmergency, setIsEmergency] = useState(false);
   const [emergencyStatus, setEmergencyStatus] = useState('');
@@ -46,8 +51,7 @@ const Doctors = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [doctorData, postData] = await Promise.all([fetchDoctors(), fetchPosts()]);
-        setDoctors(doctorData);
+        const [postData] = await Promise.all([fetchPosts()]);
         setPosts(postData);
       } catch (error) {
         setStatus('Unable to load dashboard data right now.');
@@ -56,6 +60,23 @@ const Doctors = () => {
 
     loadData();
   }, []);
+
+  useEffect(() => {
+    const loadDoctors = async () => {
+      setIsLoadingDoctors(true);
+      try {
+        const doctorData = await fetchDoctors(searchTerm);
+        setDoctors(doctorData);
+      } catch (error) {
+        setStatus('Unable to load doctor profiles right now.');
+      } finally {
+        setIsLoadingDoctors(false);
+      }
+    };
+
+    const timer = window.setTimeout(loadDoctors, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
   const handleSaveProfile = async (event) => {
     event.preventDefault();
@@ -111,6 +132,27 @@ const Doctors = () => {
       setPosts((current) => current.map((post) => (post.id === postId ? updated : post)));
     } catch (error) {
       setStatus('Unable to like this post.');
+    }
+  };
+
+  const handleConnectDoctor = async (doctor) => {
+    const token = localStorage.getItem('authToken');
+    const userId = Number(localStorage.getItem('userId'));
+
+    if (!token || !userId) {
+      setStatus('Please sign in to connect with doctors.');
+      return;
+    }
+
+    setIsConnectingDoctor(doctor.id);
+    try {
+      await createFollow({ follower_id: userId, following_id: doctor.id }, token);
+      setConnectedDoctorIds((current) => (current.includes(doctor.id) ? current : [...current, doctor.id]));
+      setStatus(`You are now connected with ${doctor.name}.`);
+    } catch (error) {
+      setStatus('Unable to connect with this doctor right now.');
+    } finally {
+      setIsConnectingDoctor(null);
     }
   };
 
@@ -414,12 +456,20 @@ const Doctors = () => {
           <div>
             <div style={sectionCardStyle}>
               <div style={cardHeaderStyle}>
-                <h3 style={sectionTitleStyle}>Connected doctors</h3>
+                <h3 style={sectionTitleStyle}>Find doctors</h3>
                 <FaNetworkWired style={{ color: '#60a5fa' }} />
               </div>
+              <input
+                style={{ ...inputStyle, marginBottom: '1rem' }}
+                placeholder="Search by name, specialty, hospital, or registration"
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
               <div style={{ display: 'grid', gap: '1rem' }}>
-                {doctors.length === 0 ? (
-                  <p style={{ color: '#94a3b8' }}>No doctor connections yet.</p>
+                {isLoadingDoctors ? (
+                  <p style={{ color: '#94a3b8' }}>Searching doctor profiles...</p>
+                ) : doctors.length === 0 ? (
+                  <p style={{ color: '#94a3b8' }}>No doctors found. Try another search.</p>
                 ) : (
                   doctors.map((doctor) => (
                     <DoctorCard
@@ -430,6 +480,8 @@ const Doctors = () => {
                       verified={doctor.verified}
                       yearsExperience={doctor.years_experience}
                       registration_number={doctor.registration_number}
+                      onConnect={() => handleConnectDoctor(doctor)}
+                      isConnected={connectedDoctorIds.includes(doctor.id)}
                     />
                   ))
                 )}

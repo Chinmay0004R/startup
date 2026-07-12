@@ -25,6 +25,7 @@ def list_doctors(search: str | None = None, db: Session = Depends(get_db)):
             years_experience=int(u.years_experience) if u.years_experience is not None else None,
             registration_number=u.medical_license,
             verified=bool(u.is_verified),
+            profile_image=u.profile_image,
         )
         for u in users
     ]

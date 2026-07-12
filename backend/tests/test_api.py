@@ -7,6 +7,9 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.core.database import SessionLocal
 from app.models.email_verification import EmailVerification
+from app.models.user import User
+from app.models.doctor_profile import DoctorProfile
+from app.models.certificate import Certificate
 
 
 class SafetyNetworkAPITests(unittest.TestCase):
@@ -161,6 +164,136 @@ class SafetyNetworkAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["user"]["email"], "google.user@example.com")
         self.assertTrue(response.json()["user"]["is_verified"])
+
+    @patch("app.api.v1.users.upload_image")
+    def test_profile_image_upload_persists_secure_url(self, mock_upload_image):
+        mock_upload_image.return_value = {
+            "secure_url": "https://res.cloudinary.com/test/profile.png",
+            "public_id": "profile-123",
+        }
+        token = self.login_user("testdoctor@example.com", "password123")
+
+        files = {"file": ("avatar.png", b"fake-image-bytes", "image/png")}
+        response = self.client.post(
+            "/api/v1/users/me/profile-image",
+            headers=self.auth_header(token),
+            files=files,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["profile_image"], "https://res.cloudinary.com/test/profile.png")
+
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == "testdoctor@example.com").first()
+            self.assertEqual(user.profile_image, "https://res.cloudinary.com/test/profile.png")
+            self.assertEqual(user.profile_image_public_id, "profile-123")
+
+    @patch("app.api.v1.doctor_profiles.upload_asset")
+    def test_doctor_license_upload_persists_secure_url(self, mock_upload_asset):
+        mock_upload_asset.return_value = {
+            "secure_url": "https://res.cloudinary.com/test/license.pdf",
+            "public_id": "license-456",
+        }
+
+        token = self.login_user("testdoctor@example.com", "password123")
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == "testdoctor@example.com").first()
+            profile = DoctorProfile(user_id=user.id, specialty="Cardiology", hospital="Test Hospital")
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
+            profile_id = profile.id
+
+        files = {"file": ("license.pdf", b"fake-pdf-bytes", "application/pdf")}
+        response = self.client.post(
+            "/api/v1/doctor-profiles/license",
+            headers=self.auth_header(token),
+            files=files,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["license_document_url"], "https://res.cloudinary.com/test/license.pdf")
+        self.assertEqual(response.json()["verification_status"], "pending")
+
+        with SessionLocal() as db:
+            profile = db.query(DoctorProfile).filter(DoctorProfile.id == profile_id).first()
+            self.assertEqual(profile.license_document_url, "https://res.cloudinary.com/test/license.pdf")
+            self.assertEqual(profile.license_public_id, "license-456")
+
+    @patch("app.api.v1.doctor_profiles.upload_asset")
+    def test_doctor_certificate_upload_persists_secure_url(self, mock_upload_asset):
+        mock_upload_asset.return_value = {
+            "secure_url": "https://res.cloudinary.com/test/certificate.pdf",
+            "public_id": "certificate-789",
+        }
+
+        token = self.login_user("testdoctor@example.com", "password123")
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == "testdoctor@example.com").first()
+            profile = DoctorProfile(user_id=user.id, specialty="Cardiology", hospital="Test Hospital")
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
+            profile_id = profile.id
+
+        files = {"file": ("certificate.pdf", b"fake-pdf-bytes", "application/pdf")}
+        response = self.client.post(
+            "/api/v1/doctor-profiles/certificate",
+            headers=self.auth_header(token),
+            files=files,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["certificate_url"], "https://res.cloudinary.com/test/certificate.pdf")
+
+        with SessionLocal() as db:
+            certificate = db.query(Certificate).filter(Certificate.doctor_id == profile_id).first()
+            self.assertIsNotNone(certificate)
+            self.assertEqual(certificate.certificate_url, "https://res.cloudinary.com/test/certificate.pdf")
+            self.assertEqual(certificate.public_id, "certificate-789")
+
+    @patch("app.api.v1.users.delete_asset")
+    @patch("app.api.v1.users.upload_image")
+    def test_profile_image_replacement_deletes_old_cloudinary_asset(self, mock_upload_image, mock_delete_asset):
+        mock_upload_image.return_value = {
+            "secure_url": "https://res.cloudinary.com/test/new.png",
+            "public_id": "new-profile",
+        }
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == "testdoctor@example.com").first()
+            user.profile_image_public_id = "old-profile"
+            db.commit()
+
+        token = self.login_user("testdoctor@example.com", "password123")
+        response = self.client.post(
+            "/api/v1/users/me/profile-image",
+            headers=self.auth_header(token),
+            files={"file": ("avatar.png", b"new-bytes", "image/png")},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        mock_delete_asset.assert_called_once_with("old-profile", resource_type="image")
+
+    def test_invalid_file_rejected(self):
+        token = self.login_user("testdoctor@example.com", "password123")
+        response = self.client.post(
+            "/api/v1/users/me/profile-image",
+            headers=self.auth_header(token),
+            files={"file": ("avatar.txt", b"not-an-image", "text/plain")},
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_oversized_file_rejected(self):
+        token = self.login_user("testdoctor@example.com", "password123")
+        oversized = b"x" * (10 * 1024 * 1024 + 1)
+        response = self.client.post(
+            "/api/v1/users/me/profile-image",
+            headers=self.auth_header(token),
+            files={"file": ("avatar.png", oversized, "image/png")},
+        )
+
+        self.assertEqual(response.status_code, 400)
 
 
 if __name__ == "__main__":

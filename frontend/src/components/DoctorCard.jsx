@@ -1,6 +1,17 @@
-import { FaStethoscope, FaHospital, FaCalendar, FaCheckCircle } from 'react-icons/fa';
+import { FaStethoscope, FaHospital, FaCalendar, FaCheckCircle, FaUserPlus } from 'react-icons/fa';
 
-const DoctorCard = ({ name, specialty, hospital, verified, yearsExperience, registrationNumber, registration_number, onViewProfile }) => {
+const DoctorCard = ({
+  name,
+  specialty,
+  hospital,
+  verified,
+  yearsExperience,
+  registrationNumber,
+  registration_number,
+  onViewProfile,
+  onConnect,
+  isConnected,
+}) => {
   return (
     <div className="card-hover" style={{ padding: '1.5rem' }}>
       {/* Header with icon */}
@@ -60,36 +71,51 @@ const DoctorCard = ({ name, specialty, hospital, verified, yearsExperience, regi
         </div>
       </div>
 
-      {/* Hover action */}
-      <button
-        type="button"
-        onClick={onViewProfile}
-        style={{
-          marginTop: '1rem',
-          width: '100%',
-          padding: '0.5rem',
-          borderRadius: '0.5rem',
-          border: '1px solid rgba(59, 130, 246, 0.3)',
-          backgroundColor: onViewProfile ? 'rgba(59, 130, 246, 0.1)' : 'rgba(71, 85, 105, 0.2)',
-          color: '#93c5fd',
-          fontSize: '0.9rem',
-          fontWeight: 500,
-          cursor: onViewProfile ? 'pointer' : 'default',
-          transition: 'all 0.2s ease'
-        }}
-        onMouseEnter={e => {
-          if (!onViewProfile) return;
-          e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
-          e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
-        }}
-        onMouseLeave={e => {
-          if (!onViewProfile) return;
-          e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-          e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-        }}
-      >
-        View Profile
-      </button>
+      <div style={{ display: 'grid', gap: '0.75rem', marginTop: '1rem' }}>
+        {onViewProfile && (
+          <button
+            type="button"
+            onClick={onViewProfile}
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              borderRadius: '0.5rem',
+              border: '1px solid rgba(59, 130, 246, 0.3)',
+              backgroundColor: 'rgba(59, 130, 246, 0.1)',
+              color: '#93c5fd',
+              fontSize: '0.9rem',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            View Profile
+          </button>
+        )}
+        {onConnect && (
+          <button
+            type="button"
+            onClick={onConnect}
+            style={{
+              width: '100%',
+              padding: '0.6rem',
+              borderRadius: '0.5rem',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              backgroundColor: isConnected ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.12)',
+              color: '#bbf7d0',
+              fontSize: '0.9rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.45rem',
+            }}
+          >
+            <FaUserPlus /> {isConnected ? 'Connected' : 'Connect'}
+          </button>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaStethoscope, FaUpload, FaCheckCircle, FaUsers, FaShieldAlt, FaAward } from 'react-icons/fa';
+import { createDoctorProfile, uploadDoctorLicenseDocument, uploadDoctorCertificate } from '../services/api';
 
 const DoctorSetup = ({ setCurrentRole }) => {
   const [form, setForm] = useState({
@@ -9,11 +10,14 @@ const DoctorSetup = ({ setCurrentRole }) => {
     yearsOfExperience: '',
     medicalLicense: '',
     certificate: null,
+    licenseFile: null,
   });
 
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState('');
 
   const navigate = useNavigate();
 
@@ -32,6 +36,10 @@ const DoctorSetup = ({ setCurrentRole }) => {
     setForm(prev => ({ ...prev, certificate: e.target.files[0] }));
   };
 
+  const handleLicenseFileChange = (e) => {
+    setForm(prev => ({ ...prev, licenseFile: e.target.files[0] }));
+  };
+
   const handleSkip = () => {
     // Skip professional setup and go directly to dashboard
     navigate('/dashboard');
@@ -40,6 +48,9 @@ const DoctorSetup = ({ setCurrentRole }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setUploadProgress(0);
+    setUploadStatus('');
+    setMessage('');
 
     // Validation
     if (!form.specialization.trim()) {
@@ -72,36 +83,80 @@ const DoctorSetup = ({ setCurrentRole }) => {
       return;
     }
 
-    try {
-      // For now, just store the data in localStorage
-      // In a real app, you would upload the file and save to backend
-      const certificateName = form.certificate.name;
-      const fileSize = (form.certificate.size / (1024 * 1024)).toFixed(2); // Size in MB
+    if (!form.licenseFile) {
+      showNotification('Please upload your medical license document', 'error');
+      setIsLoading(false);
+      return;
+    }
 
-      // Store doctor info
-      const doctorInfo = {
-        specialization: form.specialization,
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (!allowedTypes.includes(form.certificate.type)) {
+      showNotification('Unsupported certificate format. Upload PDF or image files only.', 'error');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!allowedTypes.includes(form.licenseFile.type)) {
+      showNotification('Unsupported license format. Upload PDF or image files only.', 'error');
+      setIsLoading(false);
+      return;
+    }
+
+    if (form.certificate.size > 10 * 1024 * 1024) {
+      showNotification('Certificate must be 10 MB or smaller.', 'error');
+      setIsLoading(false);
+      return;
+    }
+
+    if (form.licenseFile.size > 10 * 1024 * 1024) {
+      showNotification('License document must be 10 MB or smaller.', 'error');
+      setIsLoading(false);
+      return;
+    }
+
+    const token = localStorage.getItem('authToken');
+    const userId = localStorage.getItem('userId');
+
+    if (!token || !userId) {
+      showNotification('Authentication error. Please log in again.', 'error');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const doctorPayload = {
+        user_id: Number(userId),
+        specialty: form.specialization,
         hospital: form.hospital,
-        yearsOfExperience: parseInt(form.yearsOfExperience),
-        medicalLicense: form.medicalLicense,
-        certificateName: certificateName,
-        certificateSize: fileSize,
-        uploadedAt: new Date().toISOString(),
+        years_experience: Number(form.yearsOfExperience),
+        medical_license: form.medicalLicense,
+        bio: form.bio || '',
       };
 
-      localStorage.setItem('doctorInfo', JSON.stringify(doctorInfo));
+      const createdProfile = await createDoctorProfile(doctorPayload, token);
+      setUploadStatus('Uploading license document...');
+
+      const licenseFormData = new FormData();
+      licenseFormData.append('file', form.licenseFile);
+      await uploadDoctorLicenseDocument(licenseFormData, token, setUploadProgress);
+
+      const certificateFormData = new FormData();
+      certificateFormData.append('file', form.certificate);
+      await uploadDoctorCertificate(certificateFormData, token, setUploadProgress);
+      setUploadStatus('Upload complete.');
+      showNotification('Professional profile, license, and certificate uploaded successfully!', 'success');
+
       localStorage.setItem('currentRole', 'doctor');
       setCurrentRole('doctor');
 
-      showNotification('Professional profile saved successfully!', 'success');
-      
       setTimeout(() => {
         navigate('/dashboard');
       }, 1000);
     } catch (error) {
-      showNotification('Error saving professional info. Please try again.', 'error');
+      showNotification(error.message || 'Error saving professional info. Please try again.', 'error');
     } finally {
       setIsLoading(false);
+      setTimeout(() => setUploadProgress(0), 1500);
     }
   };
 
@@ -227,18 +282,14 @@ const DoctorSetup = ({ setCurrentRole }) => {
   };
 
   const followers = [
-    { id: 1, name: 'Dr. Amit Patel', role: 'Cardiologist', since: '2d ago' },
-    { id: 2, name: 'Sneha Kumar', role: 'Patient', since: '4d ago' },
-    { id: 3, name: 'Dr. Anjali Mehta', role: 'Oncologist', since: '1w ago' },
-    { id: 4, name: 'Rohit Sharma', role: 'Patient', since: '1w ago' },
-    { id: 5, name: 'Dr. Neha Roy', role: 'Pediatrician', since: '2w ago' },
+    // placeholder until replaced by backend data
   ];
 
+  // if we later show followers in this setup flow, fetch from API
+  // left intentionally minimal for now
+
   const verificationStatus = [
-    { id: 1, label: 'Identity Verified', active: true },
-    { id: 2, label: 'NMC Verified', active: true },
-    { id: 3, label: 'Degree Verified', active: true },
-    { id: 4, label: 'Hospital Verified', active: false },
+    // defaults; actual status should come from doctor profile endpoint
   ];
 
   const achievements = [
@@ -447,12 +498,33 @@ const DoctorSetup = ({ setCurrentRole }) => {
               </div>
 
               <div style={formGroupStyle}>
+                <label style={labelStyle}>Medical License Document *</label>
+                <label style={fileInputStyle}>
+                  <input
+                    type="file"
+                    onChange={handleLicenseFileChange}
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    style={{ display: 'none' }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                    <FaUpload style={{ fontSize: '1.5rem', color: '#667eea' }} />
+                    <span style={{ color: '#667eea', fontWeight: '600' }}>
+                      {form.licenseFile ? form.licenseFile.name : 'Click to upload license document'}
+                    </span>
+                    <span style={{ fontSize: '0.85rem', color: '#718096' }}>
+                      PDF, JPG, PNG up to 10MB
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              <div style={formGroupStyle}>
                 <label style={labelStyle}>Medical Certificate / Degree *</label>
                 <label style={fileInputStyle}>
                   <input
                     type="file"
                     onChange={handleFileChange}
-                    accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                    accept=".pdf,.jpg,.jpeg,.png"
                     style={{ display: 'none' }}
                   />
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
@@ -461,7 +533,7 @@ const DoctorSetup = ({ setCurrentRole }) => {
                       {form.certificate ? form.certificate.name : 'Click to upload certificate'}
                     </span>
                     <span style={{ fontSize: '0.85rem', color: '#718096' }}>
-                      PDF, JPG, PNG, DOC up to 10MB
+                      PDF, JPG, PNG up to 10MB
                     </span>
                   </div>
                 </label>

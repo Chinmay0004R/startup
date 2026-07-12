@@ -9,6 +9,7 @@ class DoctorBase(BaseModel):
     years_experience: int | None = None
     registration_number: str | None = None
     verified: bool = False
+    profile_image: str | None = None
 
 
 class DoctorCreate(DoctorBase):

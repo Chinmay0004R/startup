@@ -24,6 +24,7 @@ class User(Base):
     
     # Profile Information
     profile_image = Column(String(500), nullable=True)
+    profile_image_public_id = Column(String(255), nullable=True)
     bio = Column(String(500), nullable=True)
     city = Column(String(100), nullable=True)
     

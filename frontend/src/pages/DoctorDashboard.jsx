@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import DoctorCard from '../components/DoctorCard';
-import { fetchDoctors, fetchPosts, createPost, likePost, createSafetyAlert } from '../services/api';
+import { fetchDoctors, fetchPosts, createPost, likePost, createSafetyAlert, createFollow } from '../services/api';
 import { FaUserMd, FaNetworkWired, FaPencilAlt, FaHeart, FaExclamationTriangle } from 'react-icons/fa';
 
 const DoctorDashboard = ({ currentEmail }) => {
@@ -11,8 +11,11 @@ const DoctorDashboard = ({ currentEmail }) => {
   const navigate = useNavigate();
   const [posts, setPosts] = useState([]);
   const [content, setContent] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [connectedDoctorIds, setConnectedDoctorIds] = useState([]);
   const [status, setStatus] = useState('');
   const [isPosting, setIsPosting] = useState(false);
+  const [isConnectingDoctor, setIsConnectingDoctor] = useState(null);
   const [isEmergency, setIsEmergency] = useState(false);
   const [emergencyStatus, setEmergencyStatus] = useState('');
 
@@ -21,8 +24,7 @@ const DoctorDashboard = ({ currentEmail }) => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [doctorData, postData] = await Promise.all([fetchDoctors(), fetchPosts()]);
-        setDoctors(doctorData);
+        const [postData] = await Promise.all([fetchPosts()]);
         setPosts(postData);
       } catch (error) {
         setStatus('Unable to load dashboard information right now.');
@@ -31,6 +33,20 @@ const DoctorDashboard = ({ currentEmail }) => {
 
     loadData();
   }, [currentEmail]);
+
+  useEffect(() => {
+    const loadDoctors = async () => {
+      try {
+        const doctorData = await fetchDoctors(searchTerm);
+        setDoctors(doctorData);
+      } catch (error) {
+        setStatus('Unable to load doctor profiles right now.');
+      }
+    };
+
+    const timer = window.setTimeout(loadDoctors, 250);
+    return () => window.clearTimeout(timer);
+  }, [searchTerm]);
 
   const handlePost = async (event) => {
     event.preventDefault();
@@ -65,6 +81,27 @@ const DoctorDashboard = ({ currentEmail }) => {
       setPosts((current) => current.map((post) => (post.id === postId ? updated : post)));
     } catch (error) {
       setStatus('Unable to like the post.');
+    }
+  };
+
+  const handleConnectDoctor = async (doctor) => {
+    const token = localStorage.getItem('authToken');
+    const userId = Number(localStorage.getItem('userId'));
+
+    if (!token || !userId) {
+      setStatus('Please sign in to connect with doctors.');
+      return;
+    }
+
+    setIsConnectingDoctor(doctor.id);
+    try {
+      await createFollow({ follower_id: userId, following_id: doctor.id }, token);
+      setConnectedDoctorIds((current) => (current.includes(doctor.id) ? current : [...current, doctor.id]));
+      setStatus(`You are now connected with ${doctor.name}.`);
+    } catch (error) {
+      setStatus('Unable to connect with this doctor right now.');
+    } finally {
+      setIsConnectingDoctor(null);
     }
   };
 
@@ -220,8 +257,22 @@ const DoctorDashboard = ({ currentEmail }) => {
                 <h2 style={sectionTitleStyle}>Connected doctors</h2>
                 <FaNetworkWired style={{ color: '#60a5fa' }} />
               </div>
+              <input
+                style={{
+                  width: '100%',
+                  borderRadius: '0.75rem',
+                  border: '1px solid #475569',
+                  backgroundColor: '#0f172a',
+                  color: '#f8fafc',
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1rem',
+                }}
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                placeholder="Search doctors by name, specialty, hospital, or registration"
+              />
               {doctors.length === 0 ? (
-                <p style={{ color: '#94a3b8' }}>No connected doctors available.</p>
+                <p style={{ color: '#94a3b8' }}>No doctors found. Try another search.</p>
               ) : (
                 <div style={{ display: 'grid', gap: '1rem' }}>
                   {doctors.map((doctor) => (
@@ -234,6 +285,8 @@ const DoctorDashboard = ({ currentEmail }) => {
                       yearsExperience={doctor.years_experience}
                       registration_number={doctor.registration_number}
                       onViewProfile={() => navigate(`/doctors/${doctor.id}`)}
+                      onConnect={() => handleConnectDoctor(doctor)}
+                      isConnected={connectedDoctorIds.includes(doctor.id)}
                     />
                   ))}
                 </div>

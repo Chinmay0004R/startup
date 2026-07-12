@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { fetchPosts, createPost, likePost } from '../services/api';
 import { FaEllipsisH, FaThumbsUp, FaComment, FaShare, FaBookmark } from 'react-icons/fa';
 
 const Dashboard = ({ currentRole, currentUserEmail, authToken, onLogout }) => {
@@ -28,52 +29,41 @@ const Dashboard = ({ currentRole, currentUserEmail, authToken, onLogout }) => {
       });
     }
 
-    // Load sample posts
-    setPosts([
-      {
-        id: 1,
-        author: 'Dr. Rahul Sharma',
-        role: 'Cardiologist',
-        time: '2 hours ago',
-        content: 'Just completed a successful cardiac surgery. Grateful for my amazing team!',
-        likes: 124,
-        comments: 18,
-        image: null,
-      },
-      {
-        id: 2,
-        author: 'Dr. Priya Singh',
-        role: 'Pediatrician',
-        time: '5 hours ago',
-        content: 'New research on childhood immunization shows promising results...',
-        likes: 89,
-        comments: 24,
-        image: null,
-      },
-    ]);
+    // Load posts from backend
+    const load = async () => {
+      setIsLoadingPosts(true);
+      try {
+        const data = await fetchPosts();
+        // backend returns array of posts (or null)
+        setPosts(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Failed to load posts', err);
+        setPosts([]);
+      } finally {
+        setIsLoadingPosts(false);
+      }
+    };
+
+    load();
   }, [currentUserEmail, currentRole]);
 
   const handleCreatePost = async (e) => {
     e.preventDefault();
     if (!newPost.trim()) return;
-
     setIsLoadingPosts(true);
-    // Simulating post creation
-    setTimeout(() => {
-      const post = {
-        id: posts.length + 1,
-        author: user?.name || 'Anonymous',
-        role: currentRole,
-        time: 'now',
-        content: newPost,
-        likes: 0,
-        comments: 0,
-        image: null,
-      };
-      setPosts([post, ...posts]);
+    try {
+      const payload = { author_name: user?.name || 'Anonymous', content: newPost };
+      const created = await createPost(payload, authToken);
+      if (created) {
+        setPosts((p) => [created, ...(p || [])]);
+      }
       setNewPost('');
+    } catch (err) {
+      console.error('Create post failed', err);
+      alert('Failed to publish post');
+    } finally {
       setIsLoadingPosts(false);
-    }, 500);
+    }
   };
 
   const handleEditProfile = () => {
@@ -387,16 +377,25 @@ const Dashboard = ({ currentRole, currentUserEmail, authToken, onLogout }) => {
           </div>
 
           {/* Posts Feed */}
-          {posts.map((post) => (
-            <div key={post.id} style={postStyle}>
+          {isLoadingPosts && !posts.length ? (
+            <div style={postStyle}>Loading posts...</div>
+          ) : posts.length === 0 ? (
+            <div style={postStyle}>
+              <div style={{ fontWeight: 700, marginBottom: '0.5rem' }}>What's on your mind?</div>
+              <p style={{ color: '#94a3b8' }}>(No posts yet)</p>
+              <p style={{ color: '#718096', marginTop: '0.5rem' }}>Be the first to share something.</p>
+            </div>
+          ) : (
+            posts.map((post) => (
+              <div key={post.id} style={postStyle}>
               <div style={postHeaderStyle}>
                 <div style={postAuthorStyle}>
                   <div style={postAvatarStyle}>
-                    {post.author.charAt(0).toUpperCase()}
+                    {(post.author_name || post.author || 'A').charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <div style={postNameStyle}>{post.author}</div>
-                    <div style={postMetaStyle}>{post.role} • {post.time}</div>
+                    <div style={postNameStyle}>{post.author_name || post.author}</div>
+                    <div style={postMetaStyle}>{post.role || ''} • {post.created_at ? new Date(post.created_at).toLocaleString() : post.time || ''}</div>
                   </div>
                 </div>
                 <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem' }}>
@@ -407,11 +406,18 @@ const Dashboard = ({ currentRole, currentUserEmail, authToken, onLogout }) => {
               <div style={postContentStyle}>{post.content}</div>
 
               <div style={postActionsStyle}>
-                <button style={actionButtonStyle}>
-                  <FaThumbsUp /> {post.likes}
+                <button style={actionButtonStyle} onClick={async () => {
+                  try {
+                    const updated = await likePost(post.id, authToken);
+                    setPosts((prev) => prev.map(p => p.id === post.id ? updated : p));
+                  } catch (e) {
+                    console.error('Like failed', e);
+                  }
+                }}>
+                  <FaThumbsUp /> {post.likes || 0}
                 </button>
                 <button style={actionButtonStyle}>
-                  <FaComment /> {post.comments}
+                  <FaComment /> {post.comments || 0}
                 </button>
                 <button style={actionButtonStyle}>
                   <FaShare /> Share
@@ -420,8 +426,9 @@ const Dashboard = ({ currentRole, currentUserEmail, authToken, onLogout }) => {
                   <FaBookmark />
                 </button>
               </div>
-            </div>
-          ))}
+              </div>
+            ))
+          )}
         </div>
 
         {/* Right Sidebar - Doctor News */}

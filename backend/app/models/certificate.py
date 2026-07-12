@@ -13,6 +13,7 @@ class Certificate(Base):
     doctor_id = Column(Integer, ForeignKey("doctor_profiles.id"), nullable=False)
     title = Column(String(150), nullable=False)
     certificate_url = Column(String(255), nullable=False)
+    public_id = Column(String(255), nullable=True)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
 
     doctor = relationship("DoctorProfile", back_populates="certificates")

@@ -20,6 +20,8 @@ class DoctorProfileRead(BaseModel):
     years_experience: str | None = None
     medical_license: str | None = None
     bio: str | None = None
+    license_document_url: str | None = None
+    verification_status: str | None = None
 
     class Config:
         orm_mode = True
