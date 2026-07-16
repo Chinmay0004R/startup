@@ -36,32 +36,13 @@ def create_review(payload: ReviewCreate, current_user: dict = Depends(get_curren
     db.commit()
     db.refresh(review)
 
-    return ReviewRead(
-        id=review.id,
-        reviewer_id=review.reviewer_id,
-        reviewer_name=reviewer.name,
-        doctor_id=review.doctor_id,
-        rating=review.rating,
-        comment=review.comment,
-        created_at=review.created_at,
-    )
+    return review
 
 
 @router.get("/doctor/{doctor_id}", response_model=List[ReviewRead])
 def list_reviews_for_doctor(doctor_id: int, db: Session = Depends(get_db)):
     reviews = db.query(Review).filter(Review.doctor_id == doctor_id).all()
-    return [
-        ReviewRead(
-            id=r.id,
-            reviewer_id=r.reviewer_id,
-            reviewer_name=r.reviewer.name if r.reviewer else None,
-            doctor_id=r.doctor_id,
-            rating=r.rating,
-            comment=r.comment,
-            created_at=r.created_at,
-        )
-        for r in reviews
-    ]
+    return reviews
 
 
 @router.put("/{review_id}", response_model=ReviewRead)
@@ -82,15 +63,7 @@ def update_review(review_id: int, payload: ReviewUpdate, current_user: dict = De
     db.commit()
     db.refresh(review)
 
-    return ReviewRead(
-        id=review.id,
-        reviewer_id=review.reviewer_id,
-        reviewer_name=reviewer.name,
-        doctor_id=review.doctor_id,
-        rating=review.rating,
-        comment=review.comment,
-        created_at=review.created_at,
-    )
+    return review
 
 
 @router.delete("/{review_id}")

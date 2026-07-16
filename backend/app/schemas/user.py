@@ -36,6 +36,7 @@ class UserRead(UserBase):
     following_count: int = 0
     posts_count: int = 0
     is_verified: bool = False
+    role: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

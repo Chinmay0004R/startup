@@ -27,41 +27,45 @@ from app.core.database import get_db, SessionLocal
 from app.models.user import User, RoleEnum
 from app.models.email_verification import EmailVerification
 
+from pydantic import BaseModel
+
+class SetRoleRequest(BaseModel):
+    role: str
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
 
 
-# Seed test users for development/testing into the database (no-op if already present)
-def _seed_test_users():
+def seed_test_users():
+    """Seed or refresh development test users with known credentials."""
+    test_accounts = (
+        ("testdoctor@example.com", "Dr. Test Doctor", RoleEnum.DOCTOR),
+        ("testpatient@example.com", "John Patient", RoleEnum.PATIENT),
+    )
     db = SessionLocal()
     try:
-        if not db.query(User).filter(User.email == "testdoctor@example.com").first():
-            u = User(
-                name="Dr. Test Doctor",
-                email="testdoctor@example.com",
-                role=RoleEnum.DOCTOR,
-                hashed_password=get_password_hash("password123"),
-                is_verified=True,
-            )
-            db.add(u)
-
-        if not db.query(User).filter(User.email == "testpatient@example.com").first():
-            u2 = User(
-                name="John Patient",
-                email="testpatient@example.com",
-                role=RoleEnum.PATIENT,
-                hashed_password=get_password_hash("password123"),
-                is_verified=True,
-            )
-            db.add(u2)
+        for email, name, role in test_accounts:
+            user = db.query(User).filter(User.email == email).first()
+            if user:
+                user.name = name
+                user.role = role
+                user.hashed_password = get_password_hash("password123")
+                user.is_verified = True
+            else:
+                db.add(
+                    User(
+                        name=name,
+                        email=email,
+                        role=role,
+                        hashed_password=get_password_hash("password123"),
+                        is_verified=True,
+                    )
+                )
 
         db.commit()
-        print("✓ Test users seeded (db)")
+        print("[seed] Test users seeded (db)")
     finally:
         db.close()
-
-
-_seed_test_users()
 
 
 def send_verification_email(email: str, otp: str) -> None:
@@ -147,7 +151,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     user = User(
         name=payload.name,
         email=email,
-        role=RoleEnum(payload.role.value),
+        role=RoleEnum.PENDING,
         hashed_password=get_password_hash(payload.password),
         is_verified=False,
     )
@@ -215,7 +219,7 @@ def google_login(payload: GoogleLoginRequest, db: Session = Depends(get_db)):
         user = User(
             name=google_user.get("name") or email.split("@", 1)[0],
             email=email,
-            role=RoleEnum.PATIENT,
+            role=RoleEnum.PENDING,
             hashed_password=get_password_hash(f"google-oauth:{email}"),
             is_verified=True,
             profile_image=google_user.get("picture"),
@@ -323,3 +327,42 @@ def get_current_user_info(current_user: dict = Depends(get_current_user), db: Se
         is_verified=user.is_verified or False,
     )
 
+
+@router.post("/set-role", response_model=LoginResponse)
+def set_role(payload: SetRoleRequest, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    email = current_user.get("email")
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    role_str = payload.role.lower().strip()
+    if role_str not in ["doctor", "patient"]:
+        raise HTTPException(status_code=400, detail="Invalid role selected")
+        
+    user.role = RoleEnum(role_str)
+    db.commit()
+    db.refresh(user)
+    
+    access_token = create_access_token(data={"email": user.email, "role": user.role.value})
+    user_response = UserResponse(
+        id=user.id,
+        name=user.name,
+        email=user.email,
+        role=user.role.value,
+        profile_image=user.profile_image,
+        bio=user.bio,
+        city=user.city,
+        specialization=user.specialization,
+        hospital=user.hospital,
+        followers_count=user.followers_count or 0,
+        following_count=user.following_count or 0,
+        posts_count=user.posts_count or 0,
+        is_verified=user.is_verified or False,
+    )
+
+    return LoginResponse(
+        message="Role updated successfully",
+        access_token=access_token,
+        token_type="bearer",
+        user=user_response,
+    )

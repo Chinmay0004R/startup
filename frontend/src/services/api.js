@@ -1,15 +1,29 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 const request = async (path, options = {}) => {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const fetchOptions = {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
-    },
-    ...options,
-  });
+    }
+  };
+
+  if (fetchOptions.body && typeof fetchOptions.body === 'object' && !(fetchOptions.body instanceof FormData)) {
+    fetchOptions.body = JSON.stringify(fetchOptions.body);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, fetchOptions);
 
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('authToken');
+      localStorage.removeItem('currentRole');
+      localStorage.removeItem('currentUserEmail');
+      localStorage.removeItem('userName');
+      localStorage.removeItem('userId');
+      window.location.href = '/login';
+    }
     const text = await response.text();
     throw new Error(`Request failed with ${response.status}: ${text}`);
   }
@@ -25,34 +39,60 @@ const request = async (path, options = {}) => {
 
 export const fetchHealth = async () => request('/');
 
-export const fetchDoctors = async (search = '') => {
+export const fetchDoctors = async (search = '', filters = {}) => {
+  const params = new URLSearchParams();
   const query = search?.trim();
-  const suffix = query ? `?search=${encodeURIComponent(query)}` : '';
+  if (query) params.set('search', query);
+  if (filters.name) params.set('name', filters.name);
+  if (filters.registrationNumber) params.set('registration_number', filters.registrationNumber);
+  if (filters.hospital) params.set('hospital', filters.hospital);
+  if (filters.city) params.set('city', filters.city);
+  if (filters.state) params.set('state', filters.state);
+  if (filters.specialization) params.set('specialization', filters.specialization);
+  if (filters.verifiedOnly) params.set('verified', 'true');
+  if (filters.minExperience) params.set('min_experience', filters.minExperience);
+  if (filters.maxExperience) params.set('max_experience', filters.maxExperience);
+
+  const suffix = params.toString() ? `?${params.toString()}` : '';
   return request(`/api/v1/doctors/${suffix}`);
 };
 
 export const createDoctor = async (doctor) =>
   request('/api/v1/doctors/', {
     method: 'POST',
-    body: JSON.stringify(doctor),
+    body: doctor,
   });
 
-export const fetchSafetyAlerts = async () => request('/api/v1/safety/alerts/');
+export const fetchSafetyAlerts = async (token) => 
+  request('/api/v1/safety/alerts/', { headers: token ? { Authorization: `Bearer ${token}` } : {} });
 
-export const createSafetyAlert = async (alert) =>
+export const createSafetyAlert = async (alert, token) =>
   request('/api/v1/safety/alerts/', {
     method: 'POST',
-    body: JSON.stringify(alert),
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: alert,
   });
 
-export const fetchPosts = async (authorId) =>
-  request(authorId ? `/api/v1/posts/?author_id=${authorId}` : '/api/v1/posts/');
+export const fetchSafetyAlertById = async (alertId, token) =>
+  request(`/api/v1/safety/alerts/${alertId}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+
+export const updateSafetyAlert = async (alertId, alert, token) =>
+  request(`/api/v1/safety/alerts/${alertId}`, {
+    method: 'PUT',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: alert,
+  });
+
+export const fetchPosts = async (token, authorId) =>
+  request(authorId ? `/api/v1/posts/?author_id=${authorId}` : '/api/v1/posts/', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
 
 export const createPost = async (post, token) =>
   request('/api/v1/posts/', {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: JSON.stringify(post),
+    body: post,
   });
 
 export const fetchDoctorById = async (doctorId) => request(`/api/v1/doctors/${doctorId}`);
@@ -125,7 +165,7 @@ export const createFollow = async (payload, token) =>
   request('/api/v1/follows/', {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: JSON.stringify(payload),
+    body: payload,
   });
 
 export const fetchDoctorProfiles = async () => request('/api/v1/doctor-profiles/');
@@ -134,7 +174,7 @@ export const createDoctorProfile = async (payload, token) =>
   request('/api/v1/doctor-profiles/', {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: JSON.stringify(payload),
+    body: payload,
   });
 
 export const uploadDoctorLicenseDocument = (formData, token, onProgress) =>
@@ -206,28 +246,68 @@ export const likePost = async (postId, token) =>
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
 
-export const fetchComplaints = async () => request('/api/v1/complaints/');
+export const fetchComplaints = async (token) => 
+  request('/api/v1/complaints/', {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
 
-export const createComplaint = async (complaint) =>
+export const createComplaint = async (complaint, token) =>
   request('/api/v1/complaints/', {
     method: 'POST',
-    body: JSON.stringify(complaint),
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: complaint,
   });
 
 export const registerUser = async (payload) =>
   request('/api/v1/auth/register', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: payload,
   });
 
 export const verifyUser = async (payload) =>
   request('/api/v1/auth/verify', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: payload,
   });
 
 export const loginUser = async (payload) =>
   request('/api/v1/auth/login', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    body: payload,
+  });
+
+// Dashboard Statistics APIs
+
+export const fetchDoctorStatistics = async (profileId, token) =>
+  request(`/api/v1/doctor-profiles/${profileId}/statistics`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+export const fetchUserStatistics = async (userId, token) =>
+  request(`/api/v1/users/${userId}/statistics`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+export const fetchUserFollowingDoctors = async (userId, token) =>
+  request(`/api/v1/users/${userId}/following-doctors`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+export const fetchUserComplaintHistory = async (userId, token) =>
+  request(`/api/v1/users/${userId}/complaints-history`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+export const setUserRole = async (role, token) =>
+  request('/api/v1/auth/set-role', {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: { role },
+  });
+
+export const deleteAccount = async (payload, token) =>
+  request('/api/v1/users/me', {
+    method: 'DELETE',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: payload,
   });

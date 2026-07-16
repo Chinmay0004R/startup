@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import Skeleton from '../components/Skeleton';
+import EmptyState from '../components/EmptyState';
 import { fetchDoctorById, fetchFollowers, fetchPosts, likePost, createSafetyAlert, uploadUserProfileImage } from '../services/api';
 import {
   FaUserMd,
@@ -44,9 +46,10 @@ const DoctorProfile = () => {
   useEffect(() => {
     const loadProfile = async () => {
       try {
+        const token = localStorage.getItem('authToken');
         const [doctorData, postData] = await Promise.all([
           fetchDoctorById(Number(doctorId)),
-          fetchPosts(Number(doctorId)),
+          fetchPosts(token, Number(doctorId)),
         ]);
         setDoctor(doctorData);
         setPosts(postData);
@@ -129,17 +132,18 @@ const DoctorProfile = () => {
 
   if (!doctor) {
     return (
-      <div>
+      <div className="page-shell">
         <Navbar />
-        <main style={{ padding: '3rem', color: '#0f172a' }}>
+        <main className="page-panel">
           <p>Loading doctor profile...</p>
-        </main>
+          <DangerZone />
+      </main>
         <Footer />
       </div>
     );
   }
 
-  const baseFollowerCount = Number(doctor?.followers_count || 1254);
+  const baseFollowerCount = Number(doctor?.followers_count || 0);
   const followerCount = (isFollowing ? baseFollowerCount + 1 : baseFollowerCount).toLocaleString();
   const isOwner = Boolean(
     doctor?.email && currentUserEmail && doctor.email.toLowerCase() === currentUserEmail.toLowerCase()
@@ -148,29 +152,29 @@ const DoctorProfile = () => {
   const aboutSections = [
     {
       title: 'Introduction',
-      content: doctor?.bio || 'Consultant physician focused on ethical care, clear communication, and long-term wellness.',
+      content: doctor?.bio || '',
     },
     {
       title: 'Experience',
       content: doctor?.years_experience
         ? `${doctor.years_experience} years of clinical experience in specialist care.`
-        : 'Experienced clinician with a strong record of safe, evidence-based treatment.',
+        : '',
     },
     {
       title: 'Research',
-      content: doctor?.research || 'Actively keeping up with medical advances and contributing to patient education initiatives.',
+      content: doctor?.research || '',
     },
     {
       title: 'Interests',
-      content: doctor?.interests || 'Preventive care, cardiology, advanced diagnostics, and transparent patient guidance.',
+      content: doctor?.interests || '',
     },
     {
       title: 'Mission',
-      content: doctor?.mission || 'Committed to compassionate care, clinical excellence, and building lasting trust with every patient.',
+      content: doctor?.mission || '',
     },
-  ];
+  ].filter((item) => item.content);
 
-  const followList = doctor?.followers || [];
+  const followList = Array.isArray(doctor?.followers) ? doctor.followers : [];
 
   // load followers when doctor changes
   useEffect(() => {
@@ -188,820 +192,380 @@ const DoctorProfile = () => {
     return () => { mounted = false; };
   }, [doctor]);
 
-  const certs = doctor?.certifications || [
-    { id: 1, name: 'MBBS', issuer: 'Mumbai University', status: 'Verified' },
-    { id: 2, name: 'MD Cardiology', issuer: 'AIIMS Delhi', status: 'Verified' },
-    { id: 3, name: 'NMC Registration', issuer: 'National Medical Commission', status: 'Active' },
-    { id: 4, name: 'Fellowship', issuer: 'American College of Cardiology', status: 'Pending' },
-  ];
-
-  const experienceItems = doctor?.experience || [
-    {
-      id: 1,
-      title: 'Senior Consultant',
-      organisation: doctor?.hospital || 'Apollo Hospital',
-      period: '2018 - Present',
-      details: 'Worked in interventional cardiology and complex procedures.',
-    },
-  ];
-
-  const educationItems = doctor?.education || [
-    { id: 1, degree: 'MBBS', school: 'Grant Medical College', year: '2008' },
-    { id: 2, degree: 'MD Cardiology', school: 'AIIMS Delhi', year: '2014' },
-  ];
-
-  const skillsList = doctor?.skills || ['Cardiology', 'Angioplasty', 'Heart Failure', 'ECG Interpretation'];
-
-  const verificationTimeline = doctor?.verification_timeline || [];
-
-  const peerReviews = doctor?.peer_reviews || [];
-
-  const publications = doctor?.publications || [
-    { id: 1, title: 'Heart Disease in Young Adults', journal: 'Indian Journal of Cardiology', year: '2022' },
-    { id: 2, title: 'Prevention Strategies for Heart Failure', journal: 'Cardiac Care Review', year: '2021' },
-  ];
-
-  const achievements = doctor?.achievements || [
-    { id: 1, title: 'Best Cardiologist 2025', issuer: 'National Medical Awards' },
-    { id: 2, title: 'Research Excellence Award', issuer: 'Indian Cardiology Society' },
-  ];
-
-  const contactInfo = doctor?.contact || {
-    hospital: doctor?.hospital || 'Apollo Hospital',
-    phone: doctor?.phone || '+91-22-1234-5678',
-    email: doctor?.email || 'clinic@example.com',
-    address: doctor?.address || 'Mumbai, India',
-    hours: doctor?.clinic_hours || 'Mon-Fri 9:00 - 17:00',
+  const experienceItems = Array.isArray(doctor?.experience) ? doctor.experience : [];
+  const educationItems = Array.isArray(doctor?.education) ? doctor.education : [];
+  const skillsList = Array.isArray(doctor?.skills) ? doctor.skills : [];
+  const verificationTimeline = Array.isArray(doctor?.verification_timeline) ? doctor.verification_timeline : [];
+  const peerReviews = Array.isArray(doctor?.peer_reviews) ? doctor.peer_reviews : [];
+  const publications = Array.isArray(doctor?.publications) ? doctor.publications : [];
+  const achievements = Array.isArray(doctor?.achievements) ? doctor.achievements : [];
+  const contactInfo = {
+    hospital: doctor?.hospital || '',
+    phone: doctor?.phone || '',
+    email: doctor?.email || '',
+    address: doctor?.address || '',
+    hours: doctor?.clinic_hours || '',
   };
-
-  const activityItems = posts.length > 0 ? posts : [
-    {
-      id: 101,
-      title: 'Health awareness post',
-      content: 'Early screening saves lives. Regular checkups help detect risks before symptoms appear.',
-      likes: 84,
-      comments: 12,
-      time: '2h ago',
+  const activityItems = Array.isArray(posts) ? posts : [];
+  const verificationStatusKey = (doctor?.verification_status || 'not_submitted').toLowerCase();
+  const verificationDetails = {
+    not_submitted: {
+      label: 'Not Submitted',
+      description: 'Verification documents have not been submitted yet.',
+      tone: 'neutral',
     },
-    {
-      id: 102,
-      title: 'Certificate shared',
-      content: 'Updated recent training certificate and continuing medical education milestone.',
-      likes: 57,
-      comments: 5,
-      time: 'Yesterday',
+    pending_verification: {
+      label: 'Pending Verification',
+      description: 'Your documents are being reviewed by the verification team.',
+      tone: 'pending',
     },
-  ];
+    verified: {
+      label: 'Verified',
+      description: 'This doctor has completed verification.',
+      tone: 'success',
+    },
+    rejected: {
+      label: 'Rejected',
+      description: doctor?.rejection_reason || 'Verification was rejected. Please review the submitted documents.',
+      tone: 'error',
+    },
+  };
+  const verificationState = verificationDetails[verificationStatusKey] || verificationDetails.not_submitted;
 
   return (
-    <div>
+    <div className="page-shell">
       <Navbar />
-      <main style={mainStyle}>
-        <section style={heroCoverStyle}>
-          <div style={heroOverlayStyle} />
-          <div style={heroContentStyle}>
-            <div style={heroInnerStyle}>
-              <div style={heroLeftStyle}>
-                <div style={profilePhotoStyle}>
-                    {doctor.profile_image ? (
-                      <img src={doctor.profile_image} alt="Doctor profile" style={heroImageStyle} />
-                    ) : (
-                      <FaUserMd style={profileIconStyle} />
-                    )}
+      <main className="page-panel">
+        <section className="hero-panel">
+          <div className="page-grid-2 align-center">
+            <div className="stacked-layout">
+              <div className="horizontal-layout align-center">
+                <div className="feature-icon-box blue large">
+                  <FaUserMd />
                 </div>
                 <div>
-                  <div style={heroTitleRowStyle}>
-                    <h1 style={heroNameStyle}>{doctor.name}</h1>
-                    {doctor.verified && <FaCheckCircle style={verifiedIconStyle} />}
-                  </div>
-                  {isOwner && (
-                    <label style={uploadLabelStyle}>
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/jpg,image/png,image/webp"
-                        onChange={handleProfileImageChange}
-                        style={{ display: 'none' }}
-                      />
-                      <span style={uploadButtonStyle}>Change profile image</span>
-                    </label>
-                  )}
-                  {uploadStatus && <p style={uploadStatusStyle}>{uploadStatus}</p>}
-                  {uploadProgress > 0 && uploadProgress < 100 && (
-                    <div style={progressBarWrapperStyle}>
-                      <div style={{ ...progressBarStyle, width: `${uploadProgress}%` }} />
-                    </div>
-                  )}
-                  {toast.message && (
-                    <div style={{ ...toastStyle, background: toast.type === 'success' ? '#d1fae5' : '#fee2e2', color: toast.type === 'success' ? '#065f46' : '#991b1b' }}>
-                      {toast.message}
-                    </div>
-                  )}
-                  <p style={heroMetaStyle}>{doctor.qualifications || 'MBBS | MD'} · {doctor.specialty || 'Specialist'}</p>
-                  <p style={heroMetaStyle}>{doctor.hospital || 'Apollo Hospital'} • {doctor.city || 'Mumbai'}</p>
-                  <div style={heroStatsRowStyle}>
-                    <span style={heroStatBadgeStyle}><FaStar /> 4.9</span>
-                    <span style={heroStatBadgeStyle}><FaUsers /> {followerCount} followers</span>
-                  </div>
+                  <h1 className="hero-title">{doctor.name}</h1>
+                  <p className="text-muted no-margin">{doctor.qualifications || 'MBBS | MD'} · {doctor.specialty || 'Specialist'}</p>
+                  <p className="text-muted no-margin">{doctor.hospital || 'Apollo Hospital'} • {doctor.city || 'Mumbai'}</p>
                 </div>
               </div>
-              <div style={heroActionsStyle}>
-                <button type="button" onClick={handleFollow} style={{ ...heroButtonStyle, background: isFollowing ? '#0f766e' : 'linear-gradient(135deg, #2563eb, #38bdf8)' }}>
-                  <FaUserPlus /> {isFollowing ? 'Following' : 'Follow'}
-                </button>
-                <a href={`mailto:${doctor.email}`} style={{ ...heroButtonStyle, background: 'rgba(255,255,255,0.12)', textDecoration: 'none' }}>
-                  <FaEnvelope /> Contact
-                </a>
-                <a href={`mailto:${doctor.email}`} style={{ ...heroButtonStyle, background: 'rgba(255,255,255,0.12)', textDecoration: 'none' }}>
-                  Message
-                </a>
+
+              {isOwner && (
+                <label className="button-secondary button-full button-upload">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleProfileImageChange}
+                    className="visually-hidden"
+                  />
+                  Change profile image
+                </label>
+              )}
+
+              {uploadStatus && <p className="text-muted no-margin">{uploadStatus}</p>}
+              {uploadProgress > 0 && uploadProgress < 100 && (
+                <div className="status-banner">
+                  <div className="status-bar" style={{ '--progress': `${uploadProgress}%` }} />
+                </div>
+              )}
+
+              {toast.message && (
+                <div className={toast.type === 'success' ? 'message-box success' : 'message-box error'}>
+                  {toast.message}
+                </div>
+              )}
+
+              <div className="card-panel card-panel-row">
+                <div className="feature-icon-box green">
+                  {verificationState.tone === 'success' ? <FaCheckCircle /> : verificationState.tone === 'error' ? <FaExclamationTriangle /> : verificationState.tone === 'pending' ? <FaCertificate /> : <FaUserMd />}
+                </div>
+                <div>
+                  <p className="section-title no-margin">{verificationState.label}</p>
+                  <p className="text-muted no-margin">{verificationState.description}</p>
+                </div>
               </div>
+
+              <div className="page-grid-2">
+                <span className="button-secondary space-between"><FaStar /> 4.9</span>
+                <span className="button-secondary space-between"><FaUsers /> {followerCount} followers</span>
+              </div>
+            </div>
+
+            <div className="page-grid-1">
+              <button
+                type="button"
+                className={`button-full button-primary ${isFollowing ? 'button-following' : ''}`}
+                onClick={handleFollow}
+              >
+                <FaUserPlus /> {isFollowing ? 'Following' : 'Follow'}
+              </button>
+              <a href={`mailto:${doctor.email}`} className="button-full button-secondary button-link">
+                <FaEnvelope /> Contact
+              </a>
+              <a href={`mailto:${doctor.email}`} className="button-full button-secondary button-link">
+                Message
+              </a>
             </div>
           </div>
         </section>
 
-        <div style={pageGridStyle}>
-          <div style={leftColumnStyle}>
+        <div className="page-grid-3">
+          <div>
             {isOwner && (
-              <section style={sectionCardStyle}>
-                <div style={sectionHeaderStyle}>
-                  <FaChartLine style={sectionIconStyle} />
-                  <h2 style={sectionTitleStyle}>Analytics</h2>
+              <section className="section-card-dark">
+                <div className="section-header-inline">
+                  <FaChartLine className="section-icon" />
+                  <h2 className="section-title no-margin">Analytics</h2>
                 </div>
-                <div style={analyticsGridStyle}>
-                  <div style={analyticsCardStyle}>
-                    <p style={analyticsLabelStyle}>Profile views</p>
-                    <p style={analyticsValueStyle}>245</p>
+                <div className="analytics-grid">
+                  <div className="analytics-card">
+                    <p className="analytics-label">Posts</p>
+                    <p className="analytics-value">{posts.length}</p>
                   </div>
-                  <div style={analyticsCardStyle}>
-                    <p style={analyticsLabelStyle}>Post impressions</p>
-                    <p style={analyticsValueStyle}>8,412</p>
+                  <div className="analytics-card">
+                    <p className="analytics-label">Followers</p>
+                    <p className="analytics-value">{followerCount}</p>
                   </div>
-                  <div style={analyticsCardStyle}>
-                    <p style={analyticsLabelStyle}>Followers</p>
-                    <p style={analyticsValueStyle}>{followerCount}</p>
-                  </div>
-                  <div style={analyticsCardStyle}>
-                    <p style={analyticsLabelStyle}>Search appearance</p>
-                    <p style={analyticsValueStyle}>82</p>
+                  <div className="analytics-card">
+                    <p className="analytics-label">Verification</p>
+                    <p className="analytics-value">{verificationState.label}</p>
                   </div>
                 </div>
               </section>
             )}
 
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaUserMd style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>About</h2>
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaUserMd className="section-icon" />
+                <h2 className="section-title no-margin">About</h2>
               </div>
-              {aboutSections.map((item) => (
-                <div key={item.title} style={infoRowStyle}>
-                  <span style={infoLabelStyle}>{item.title}</span>
-                  <p style={infoTextStyle}>{item.content}</p>
+              {aboutSections.length === 0 ? (
+                <p className="empty-state-text">No profile details have been added yet.</p>
+              ) : aboutSections.map((item) => (
+                <div key={item.title} className="info-row">
+                  <span className="info-label">{item.title}</span>
+                  <p className="info-text">{item.content}</p>
                 </div>
               ))}
             </section>
 
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaHeart style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>Activity</h2>
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaHeart className="section-icon" />
+                <h2 className="section-title no-margin">Activity</h2>
               </div>
-              {activityItems.map((item) => (
-                <div key={item.id} style={postStyle}>
-                  <div style={postHeaderStyle}>
+              {activityItems.length === 0 ? (
+                <p className="empty-state-text">No activity posted yet.</p>
+              ) : activityItems.map((item) => (
+                <div key={item.id} className="post-card">
+                  <div className="post-header">
                     <div>
-                      <strong style={postTitleStyle}>{item.title}</strong>
-                      <p style={postMetaStyle}>{item.time}</p>
+                      <strong className="post-title">{item.title}</strong>
+                      <p className="post-meta">{item.time}</p>
                     </div>
                   </div>
-                  <p style={postContentStyle}>{item.content}</p>
-                  <div style={postActionsStyle}>
-                    <span style={postActionItemStyle}><FaHeart /> {item.likes}</span>
-                    <span style={postActionItemStyle}><FaComment /> {item.comments}</span>
-                    <span style={postActionItemStyle}><FaShare /> Share</span>
+                  <p className="post-content">{item.content}</p>
+                  <div className="post-actions">
+                    <span className="post-action-item"><FaHeart /> {item.likes}</span>
+                    <span className="post-action-item"><FaComment /> {item.comments}</span>
+                    <span className="post-action-item"><FaShare /> Share</span>
                   </div>
                 </div>
               ))}
             </section>
 
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaBriefcase style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>Experience</h2>
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaBriefcase className="section-icon" />
+                <h2 className="section-title no-margin">Experience</h2>
               </div>
-              <div style={timelineListStyle}>
-                {experienceItems.map((exp) => (
-                  <div key={exp.id} style={timelineItemStyle}>
-                    <strong style={timelineItemTitle}>{exp.title}</strong>
-                    <p style={timelineItemMeta}>{exp.organisation} · {exp.period}</p>
-                    <p style={timelineItemText}>{exp.details}</p>
+              <div className="timeline-list">
+                {experienceItems.length === 0 ? (
+                  <p className="empty-state-text">No experience details added yet.</p>
+                ) : experienceItems.map((exp) => (
+                  <div key={exp.id} className="timeline-item">
+                    <strong className="timeline-title">{exp.title}</strong>
+                    <p className="timeline-meta">{exp.organisation} · {exp.period}</p>
+                    <p className="timeline-text">{exp.details}</p>
                   </div>
                 ))}
               </div>
             </section>
 
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaGraduationCap style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>Education</h2>
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaGraduationCap className="section-icon" />
+                <h2 className="section-title no-margin">Education</h2>
               </div>
-              <div style={timelineListStyle}>
-                {educationItems.map((edu) => (
-                  <div key={edu.id} style={timelineItemStyle}>
-                    <strong style={timelineItemTitle}>{edu.degree}</strong>
-                    <p style={timelineItemMeta}>{edu.school}</p>
-                    <p style={timelineYearStyle}>{edu.year}</p>
+              <div className="timeline-list">
+                {educationItems.length === 0 ? (
+                  <p className="empty-state-text">No education details added yet.</p>
+                ) : educationItems.map((edu) => (
+                  <div key={edu.id} className="timeline-item">
+                    <strong className="timeline-title">{edu.degree}</strong>
+                    <p className="timeline-meta">{edu.school}</p>
+                    <p className="timeline-year">{edu.year}</p>
                   </div>
                 ))}
               </div>
             </section>
 
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaTools style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>Skills</h2>
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaTools className="section-icon" />
+                <h2 className="section-title no-margin">Skills</h2>
               </div>
-              <div style={skillListStyle}>
-                {skillsList.map((s, idx) => (
-                  <span key={idx} style={skillChipStyle}>{s}</span>
+              <div className="skill-list">
+                {skillsList.length === 0 ? (
+                  <p className="empty-state-text">No skills listed yet.</p>
+                ) : skillsList.map((s, idx) => (
+                  <span key={idx} className="skill-chip">{s}</span>
                 ))}
               </div>
             </section>
 
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaUserFriends style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>Patient Reviews</h2>
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaUserFriends className="section-icon" />
+                <h2 className="section-title no-margin">Patient Reviews</h2>
               </div>
-              <div style={timelineListStyle}>
-                {peerReviews.map((r) => (
-                  <div key={r.id} style={timelineItemStyle}>
-                    <strong style={timelineItemTitle}>{r.reviewer}</strong>
-                    <p style={timelineItemText}>{r.content}</p>
-                    <p style={timelineMetaText}>{new Date(r.date).toLocaleDateString()}</p>
+              <div className="timeline-list">
+                {peerReviews.length === 0 ? (
+                  <p className="empty-state-text">No patient reviews yet.</p>
+                ) : peerReviews.map((r) => (
+                  <div key={r.id} className="timeline-item">
+                    <strong className="timeline-title">{r.reviewer}</strong>
+                    <p className="timeline-text">{r.content}</p>
+                    <p className="timeline-meta">{new Date(r.date).toLocaleDateString()}</p>
                   </div>
                 ))}
               </div>
             </section>
 
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaFileAlt style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>Research & Publications</h2>
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaFileAlt className="section-icon" />
+                <h2 className="section-title no-margin">Research & Publications</h2>
               </div>
-              <div style={timelineListStyle}>
-                {publications.map((p) => (
-                  <div key={p.id} style={timelineItemStyle}>
-                    <strong style={timelineItemTitle}>{p.title}</strong>
-                    <p style={timelineItemMeta}>{p.journal} · {p.year}</p>
+              <div className="timeline-list">
+                {publications.length === 0 ? (
+                  <p className="empty-state-text">No publications shared yet.</p>
+                ) : publications.map((p) => (
+                  <div key={p.id} className="timeline-item">
+                    <strong className="timeline-title">{p.title}</strong>
+                    <p className="timeline-meta">{p.journal} · {p.year}</p>
                   </div>
                 ))}
               </div>
             </section>
           </div>
 
-          <aside style={rightColumnStyle}>
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaUsers style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>Followers</h2>
+          <aside className="sidebar-column">
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaUsers className="section-icon" />
+                <h2 className="section-title no-margin">Followers</h2>
               </div>
-              <div style={followersListStyle}>
-                {followList.map((follower) => (
-                  <div key={follower.id} style={followerItemStyle}>
+              <div className="followers-list">
+                {followList.length === 0 ? (
+                  <p className="empty-state-text">No followers yet.</p>
+                ) : followList.map((follower) => (
+                  <div key={follower.id} className="follower-row">
                     <div>
-                      <strong style={followerNameStyle}>{follower.name}</strong>
-                      <p style={followerRoleStyle}>{follower.role}</p>
+                      <strong className="follower-name">{follower.name}</strong>
+                      <p className="follower-role">{follower.role}</p>
                     </div>
-                    <FaUserMd style={{ color: '#38bdf8' }} />
+                    <FaUserMd className="section-icon" />
                   </div>
                 ))}
               </div>
             </section>
 
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaCalendarAlt style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>Verification Status</h2>
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaCalendarAlt className="section-icon" />
+                <h2 className="section-title no-margin">Verification Status</h2>
               </div>
-              <div style={verificationStatusStyle}>
-                {verificationTimeline.map((v) => (
-                  <div key={v.id} style={verificationStatusItemStyle}>
-                    <p style={verificationEventStyle}>{v.event}</p>
-                    <span style={{ ...badgeStyle, background: v.status === 'Verified' ? 'rgba(16,185,129,0.18)' : 'rgba(248,219,116,0.12)' }}>{v.status}</span>
+              <div className="verification-status">
+                {verificationTimeline.length === 0 ? (
+                  <p className="empty-state-text">Verification details will appear here once available.</p>
+                ) : verificationTimeline.map((v) => (
+                  <div key={v.id} className="verification-status-item">
+                    <p className="verification-event">{v.event}</p>
+                    <span className={`badge ${v.status === 'Verified' ? 'success' : v.status === 'Rejected' ? 'error' : 'pending'}`}>{v.status}</span>
                   </div>
                 ))}
               </div>
             </section>
 
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaAward style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>Achievements</h2>
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaAward className="section-icon" />
+                <h2 className="section-title no-margin">Achievements</h2>
               </div>
-              <div style={timelineListStyle}>
-                {achievements.map((a) => (
-                  <div key={a.id} style={timelineItemStyle}>
-                    <strong style={timelineItemTitle}>{a.title}</strong>
-                    <p style={timelineItemMeta}>{a.issuer}</p>
+              <div className="timeline-list">
+                {achievements.length === 0 ? (
+                  <p className="empty-state-text">No achievements shared yet.</p>
+                ) : achievements.map((a) => (
+                  <div key={a.id} className="timeline-item">
+                    <strong className="timeline-title">{a.title}</strong>
+                    <p className="timeline-meta">{a.issuer}</p>
                   </div>
                 ))}
               </div>
             </section>
 
-            <section style={sectionCardStyle}>
-              <div style={sectionHeaderStyle}>
-                <FaClinicMedical style={sectionIconStyle} />
-                <h2 style={sectionTitleStyle}>Contact & Clinic</h2>
+            <section className="section-card-dark">
+              <div className="section-header-inline">
+                <FaClinicMedical className="section-icon" />
+                <h2 className="section-title no-margin">Contact & Clinic</h2>
               </div>
-              <div style={contactInfoStyle}>
-                <div style={contactRowStyle}>
-                  <span style={contactLabelStyle}>Hospital</span>
-                  <span style={contactValueStyle}>{contactInfo.hospital}</span>
+              {contactInfo.hospital || contactInfo.phone || contactInfo.email || contactInfo.address || contactInfo.hours ? (
+                <div className="contact-info">
+                  {contactInfo.hospital && (
+                    <div className="contact-row">
+                      <span className="contact-label">Hospital</span>
+                      <span className="contact-value">{contactInfo.hospital}</span>
+                    </div>
+                  )}
+                  {contactInfo.phone && (
+                    <div className="contact-row">
+                      <span className="contact-label">Phone</span>
+                      <a href={`tel:${contactInfo.phone}`} className="contact-link">{contactInfo.phone}</a>
+                    </div>
+                  )}
+                  {contactInfo.email && (
+                    <div className="contact-row">
+                      <span className="contact-label">Email</span>
+                      <a href={`mailto:${contactInfo.email}`} className="contact-link">{contactInfo.email}</a>
+                    </div>
+                  )}
+                  {contactInfo.address && (
+                    <div className="contact-row">
+                      <span className="contact-label">Address</span>
+                      <span className="contact-value">{contactInfo.address}</span>
+                    </div>
+                  )}
+                  {contactInfo.hours && (
+                    <div className="contact-row">
+                      <span className="contact-label">Hours</span>
+                      <span className="contact-value">{contactInfo.hours}</span>
+                    </div>
+                  )}
                 </div>
-                <div style={contactRowStyle}>
-                  <span style={contactLabelStyle}>Phone</span>
-                  <a href={`tel:${contactInfo.phone}`} style={contactLinkStyle}>{contactInfo.phone}</a>
-                </div>
-                <div style={contactRowStyle}>
-                  <span style={contactLabelStyle}>Email</span>
-                  <a href={`mailto:${contactInfo.email}`} style={contactLinkStyle}>{contactInfo.email}</a>
-                </div>
-                <div style={contactRowStyle}>
-                  <span style={contactLabelStyle}>Address</span>
-                  <span style={contactValueStyle}>{contactInfo.address}</span>
-                </div>
-                <div style={contactRowStyle}>
-                  <span style={contactLabelStyle}>Hours</span>
-                  <span style={contactValueStyle}>{contactInfo.hours}</span>
-                </div>
-              </div>
+              ) : (
+                <p className="empty-state-text">No clinic contact details available yet.</p>
+              )}
             </section>
           </aside>
         </div>
 
-        {status && <p style={{ marginTop: '1.5rem', color: '#fca5a5' }}>{status}</p>}
+        {status && <p className="status-message">{status}</p>}
+        <DangerZone />
       </main>
       <Footer />
     </div>
   );
-};
-
-const mainStyle = {
-  maxWidth: '1200px',
-  margin: '0 auto',
-  padding: '3rem 1.5rem',
-  color: '#e2e8f0',
-};
-
-const heroCoverStyle = {
-  position: 'relative',
-  minHeight: '340px',
-  borderRadius: '1.75rem',
-  overflow: 'hidden',
-  backgroundImage: 'linear-gradient(135deg, rgba(14,116,144,0.9), rgba(15,23,42,0.85)), url(https://images.unsplash.com/photo-1580281657520-21b60f3f80d1?auto=format&fit=crop&w=1600&q=80)',
-  backgroundSize: 'cover',
-  backgroundPosition: 'center',
-  boxShadow: '0 25px 45px rgba(15, 23, 42, 0.24)',
-  marginBottom: '2rem',
-};
-
-const heroOverlayStyle = {
-  position: 'absolute',
-  inset: 0,
-  background: 'linear-gradient(180deg, rgba(15,23,42,0.45), rgba(15,23,42,0.85))',
-};
-
-const heroContentStyle = {
-  position: 'relative',
-  zIndex: 1,
-  minHeight: '340px',
-  display: 'flex',
-  alignItems: 'center',
-  padding: '2rem',
-};
-
-const heroInnerStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'flex-end',
-  gap: '1.5rem',
-  width: '100%',
-  flexWrap: 'wrap',
-};
-
-const heroLeftStyle = {
-  display: 'flex',
-  gap: '1.5rem',
-  alignItems: 'center',
-  minWidth: '320px',
-};
-
-const profilePhotoStyle = {
-  width: '120px',
-  height: '120px',
-  borderRadius: '50%',
-  background: 'linear-gradient(135deg, rgba(56,189,248,0.8), rgba(37,99,235,0.9))',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  boxShadow: '0 18px 35px rgba(15,23,42,0.25)',
-  overflow: 'hidden',
-};
-
-const heroImageStyle = {
-  width: '100%',
-  height: '100%',
-  objectFit: 'cover',
-};
-
-const uploadLabelStyle = {
-  display: 'inline-flex',
-  marginTop: '0.75rem',
-  cursor: 'pointer',
-};
-
-const uploadButtonStyle = {
-  padding: '0.6rem 1rem',
-  borderRadius: '9999px',
-  background: '#2563eb',
-  color: 'white',
-  fontSize: '0.9rem',
-  fontWeight: 600,
-};
-
-const uploadStatusStyle = {
-  color: '#cbd5e1',
-  marginTop: '0.75rem',
-  fontSize: '0.95rem',
-};
-
-const progressBarWrapperStyle = {
-  width: '100%',
-  height: '8px',
-  borderRadius: '9999px',
-  background: '#334155',
-  marginTop: '0.75rem',
-};
-
-const progressBarStyle = {
-  height: '100%',
-  borderRadius: '9999px',
-  background: 'linear-gradient(135deg, #38bdf8, #2563eb)',
-};
-
-const toastStyle = {
-  padding: '0.85rem 1rem',
-  borderRadius: '1rem',
-  marginTop: '1rem',
-  fontSize: '0.95rem',
-};
-
-const profileIconStyle = {
-  fontSize: '3rem',
-  color: 'white',
-};
-
-const heroTitleRowStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.75rem',
-  flexWrap: 'wrap',
-};
-
-const heroNameStyle = {
-  fontSize: 'clamp(2rem, 2.8vw, 3rem)',
-  margin: 0,
-  color: 'white',
-};
-
-const verifiedIconStyle = {
-  color: '#22c55e',
-  fontSize: '1.3rem',
-};
-
-const heroMetaStyle = {
-  margin: '0.4rem 0',
-  color: '#cbd5e1',
-  fontSize: '0.95rem',
-};
-
-const heroStatsRowStyle = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: '0.75rem',
-  marginTop: '1rem',
-};
-
-const heroStatBadgeStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.4rem',
-  background: 'rgba(255,255,255,0.12)',
-  padding: '0.6rem 0.9rem',
-  borderRadius: '999px',
-  color: 'white',
-  fontWeight: 600,
-};
-
-const heroActionsStyle = {
-  display: 'flex',
-  gap: '0.75rem',
-  flexWrap: 'wrap',
-  marginTop: '1rem',
-};
-
-const heroButtonStyle = {
-  padding: '0.9rem 1.4rem',
-  borderRadius: '999px',
-  border: '1px solid rgba(255,255,255,0.18)',
-  color: 'white',
-  fontWeight: 700,
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.5rem',
-  cursor: 'pointer',
-};
-
-const pageGridStyle = {
-  display: 'grid',
-  gridTemplateColumns: '72% 28%',
-  gap: '1.5rem',
-  alignItems: 'flex-start',
-};
-
-const leftColumnStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '1.5rem',
-};
-
-const rightColumnStyle = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '1.5rem',
-};
-
-const sectionHeaderStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '0.75rem',
-  marginBottom: '1rem',
-};
-
-const sectionIconStyle = {
-  color: '#38bdf8',
-  fontSize: '1.1rem',
-};
-
-const analyticsGridStyle = {
-  display: 'grid',
-  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-  gap: '1rem',
-};
-
-const analyticsCardStyle = {
-  background: 'rgba(15,23,42,0.8)',
-  borderRadius: '1rem',
-  padding: '1rem',
-  border: '1px solid rgba(71,85,105,0.2)',
-};
-
-const analyticsLabelStyle = {
-  margin: 0,
-  color: '#94a3b8',
-  fontSize: '0.9rem',
-};
-
-const analyticsValueStyle = {
-  margin: '0.75rem 0 0',
-  color: '#f8fafc',
-  fontSize: '1.6rem',
-  fontWeight: 700,
-};
-
-const infoLabelStyle = {
-  color: '#94a3b8',
-  width: '170px',
-  fontWeight: 600,
-};
-
-const infoTextStyle = {
-  color: '#f8fafc',
-  margin: 0,
-  maxWidth: 'calc(100% - 170px)',
-  textAlign: 'right',
-};
-
-const timelineListStyle = {
-  display: 'grid',
-  gap: '0.75rem',
-};
-
-const timelineItemStyle = {
-  padding: '0.85rem 1rem',
-  borderRadius: '1rem',
-  background: 'rgba(15,23,42,0.76)',
-  border: '1px solid rgba(71,85,105,0.16)',
-};
-
-const timelineItemTitle = {
-  color: '#f8fafc',
-  margin: 0,
-};
-
-const timelineItemMeta = {
-  color: '#94a3b8',
-  margin: '0.35rem 0 0',
-};
-
-const timelineYearStyle = {
-  color: '#94a3b8',
-  margin: '0.35rem 0 0',
-};
-
-const timelineItemText = {
-  color: '#cbd5e1',
-  margin: '0.5rem 0 0',
-};
-
-const timelineMetaText = {
-  color: '#6b7280',
-  margin: '0.5rem 0 0',
-  fontSize: '0.85rem',
-};
-
-const skillListStyle = {
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: '0.5rem',
-};
-
-const skillChipStyle = {
-  padding: '0.6rem 0.9rem',
-  borderRadius: '999px',
-  background: 'rgba(56,189,248,0.12)',
-  color: '#e6f7ff',
-  fontWeight: 600,
-};
-
-const followersListStyle = {
-  display: 'grid',
-  gap: '0.85rem',
-};
-
-const followerItemStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  padding: '0.9rem 0',
-  borderBottom: '1px solid rgba(71,85,105,0.16)',
-};
-
-const followerNameStyle = {
-  margin: 0,
-  color: '#f8fafc',
-  fontWeight: 600,
-};
-
-const followerRoleStyle = {
-  margin: '0.2rem 0 0',
-  color: '#94a3b8',
-  fontSize: '0.9rem',
-};
-
-const verificationStatusStyle = {
-  display: 'grid',
-  gap: '0.7rem',
-};
-
-const verificationStatusItemStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: '0.75rem 1rem',
-  borderRadius: '0.9rem',
-  background: 'rgba(15,23,42,0.76)',
-  border: '1px solid rgba(71,85,105,0.14)',
-};
-
-const verificationEventStyle = {
-  margin: 0,
-  color: '#f8fafc',
-  fontSize: '0.95rem',
-};
-
-const contactInfoStyle = {
-  display: 'grid',
-  gap: '0.7rem',
-};
-
-const contactRowStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-};
-
-const contactLabelStyle = {
-  color: '#94a3b8',
-  fontSize: '0.95rem',
-};
-
-const contactValueStyle = {
-  color: '#f8fafc',
-  textAlign: 'right',
-};
-
-const contactLinkStyle = {
-  color: '#f8fafc',
-  textDecoration: 'none',
-};
-
-const postTitleStyle = {
-  color: '#f8fafc',
-  margin: 0,
-};
-
-const postMetaStyle = {
-  color: '#94a3b8',
-  margin: '0.3rem 0 0',
-  fontSize: '0.9rem',
-};
-
-const postContentStyle = {
-  margin: '1rem 0 0',
-  color: '#cbd5e1',
-  lineHeight: 1.7,
-};
-
-const postActionsStyle = {
-  display: 'flex',
-  gap: '1rem',
-  marginTop: '1rem',
-  flexWrap: 'wrap',
-  color: '#38bdf8',
-};
-
-const postActionItemStyle = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: '0.35rem',
-};
-
-const postHeaderStyle = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '1rem',
-  flexWrap: 'wrap',
-};
-
-const sectionCardStyle = {
-  borderRadius: '1rem',
-  border: '1px solid rgba(71, 85, 105, 0.3)',
-  background: 'linear-gradient(135deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.78))',
-  backdropFilter: 'blur(10px)',
-  padding: '1.5rem',
-  boxShadow: '0 20px 35px rgba(2, 8, 23, 0.24)',
-};
-
-const sectionTitleStyle = {
-  fontSize: '1.15rem',
-  fontWeight: '700',
-  color: 'white',
-  margin: 0,
-};
-
-const infoRowStyle = {
-  display: 'flex',
-  justifyContent: 'space-between',
-  gap: '1rem',
-  alignItems: 'flex-start',
-  color: '#cbd5e1',
-  padding: '0.75rem 0',
-  borderBottom: '1px solid rgba(71, 85, 105, 0.2)',
-};
-
-const postStyle = {
-  padding: '1rem',
-  borderRadius: '1rem',
-  border: '1px solid rgba(71, 85, 105, 0.3)',
-  backgroundColor: 'rgba(15, 23, 42, 0.8)',
-};
-
-const certCardStyle = {
-  padding: '0.8rem 1rem',
-  borderRadius: '0.9rem',
-  border: '1px solid rgba(56, 189, 248, 0.16)',
-  background: 'rgba(15, 23, 42, 0.76)',
-};
-
-const badgeStyle = {
-  padding: '0.35rem 0.65rem',
-  borderRadius: '999px',
-  color: '#f8fafc',
-  fontSize: '0.8rem',
-  fontWeight: 700,
 };
 
 export default DoctorProfile;

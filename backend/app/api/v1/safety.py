@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.schemas.safety import SafetyAlertCreate, SafetyAlertRead
+from app.schemas.safety import SafetyAlertCreate, SafetyAlertRead, SafetyAlertUpdate
 from app.core.database import get_db
 from app.models.sos_incident import SOSIncident
 from app.models.user import RoleEnum
@@ -15,16 +15,7 @@ router = APIRouter(prefix="/safety", tags=["safety"])
 @router.get("/alerts/", response_model=List[SafetyAlertRead])
 def list_alerts(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     alerts = db.query(SOSIncident).all()
-    return [
-        SafetyAlertRead(
-            id=a.id,
-            doctor_name=a.doctor_name,
-            location=a.location,
-            details=a.description,
-            status=a.status,
-        )
-        for a in alerts
-    ]
+    return alerts
 
 
 @router.post("/alerts/", response_model=SafetyAlertRead)
@@ -42,13 +33,7 @@ def create_alert(payload: SafetyAlertCreate, current_user: dict = Depends(get_cu
     db.commit()
     db.refresh(alert)
 
-    return SafetyAlertRead(
-        id=alert.id,
-        doctor_name=alert.doctor_name,
-        location=alert.location,
-        details=alert.description,
-        status=alert.status,
-    )
+    return alert
 
 
 @router.get("/alerts/{alert_id}", response_model=SafetyAlertRead)
@@ -56,17 +41,11 @@ def get_alert(alert_id: int, current_user: dict = Depends(get_current_user), db:
     alert = db.query(SOSIncident).filter(SOSIncident.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SOS alert not found")
-    return SafetyAlertRead(
-        id=alert.id,
-        doctor_name=alert.doctor_name,
-        location=alert.location,
-        details=alert.description,
-        status=alert.status,
-    )
+    return alert
 
 
 @router.put("/alerts/{alert_id}", response_model=SafetyAlertRead)
-def update_alert(alert_id: int, payload: SafetyAlertCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+def update_alert(alert_id: int, payload: SafetyAlertUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     alert = db.query(SOSIncident).filter(SOSIncident.id == alert_id).first()
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="SOS alert not found")
@@ -74,19 +53,20 @@ def update_alert(alert_id: int, payload: SafetyAlertCreate, current_user: dict =
     if current_user.get("role") != RoleEnum.DOCTOR.value:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only doctors can update SOS alerts")
 
-    alert.doctor_name = payload.doctor_name
-    alert.location = payload.location
-    alert.description = payload.details
+    # Only update fields that are provided (partial update)
+    if payload.doctor_name is not None:
+        alert.doctor_name = payload.doctor_name
+    if payload.location is not None:
+        alert.location = payload.location
+    if payload.details is not None:
+        alert.description = payload.details
+    if payload.status is not None:
+        alert.status = payload.status
+    
     db.commit()
     db.refresh(alert)
 
-    return SafetyAlertRead(
-        id=alert.id,
-        doctor_name=alert.doctor_name,
-        location=alert.location,
-        details=alert.description,
-        status=alert.status,
-    )
+    return alert
 
 
 @router.delete("/alerts/{alert_id}")

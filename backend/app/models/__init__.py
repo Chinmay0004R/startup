@@ -9,6 +9,7 @@ from .sos_incident import SOSIncident
 from .certificate import Certificate
 from .notification import Notification
 from .post import Post
+from .post_like import PostLike
 from .comment import Comment
 from .follow import Follow
 from .email_verification import EmailVerification

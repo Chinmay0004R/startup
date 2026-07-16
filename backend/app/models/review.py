@@ -18,3 +18,8 @@ class Review(Base):
 
     reviewer = relationship("User", back_populates="reviews")
     doctor = relationship("DoctorProfile", back_populates="reviews")
+
+    @property
+    def reviewer_name(self) -> str | None:
+        """Get reviewer's name for serialization."""
+        return self.reviewer.name if self.reviewer else None

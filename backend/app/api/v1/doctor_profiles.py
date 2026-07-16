@@ -1,17 +1,26 @@
+from datetime import datetime
 from typing import List
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from app.core.database import get_db
 from app.models.doctor_profile import DoctorProfile
 from app.models.certificate import Certificate
 from app.models.user import User, RoleEnum
+from app.models.review import Review
+from app.models.sos_incident import SOSIncident
 from app.schemas.doctor_profile import DoctorProfileCreate, DoctorProfileRead
 from app.api.v1.auth import get_current_user
 from app.services.cloudinary_service import delete_asset, upload_asset
 
 router = APIRouter(prefix="/doctor-profiles", tags=["doctor_profiles"])
+
+
+class ReviewDecision(BaseModel):
+    decision: str
 
 
 @router.post("/", response_model=DoctorProfileRead)
@@ -38,8 +47,10 @@ def create_doctor_profile(payload: DoctorProfileCreate, current_user: dict = Dep
         specialization=payload.specialty,
         hospital=payload.hospital,
         years_experience=payload.years_experience,
-        medical_license=payload.medical_license,
         bio=payload.bio,
+        verification_status="not_submitted",
+        verified=False,
+        rejection_reason=None,
     )
     db.add(profile)
     db.commit()
@@ -76,7 +87,6 @@ def update_doctor_profile(profile_id: int, payload: DoctorProfileCreate, current
     profile.specialization = payload.specialty
     profile.hospital = payload.hospital
     profile.years_experience = payload.years_experience
-    profile.medical_license = payload.medical_license
     profile.bio = payload.bio
     db.commit()
     db.refresh(profile)
@@ -119,21 +129,14 @@ async def upload_license_document(
 
     profile.license_document_url = upload_result.get("secure_url")
     profile.license_public_id = upload_result.get("public_id")
-    profile.verification_status = "pending"
+    profile.verification_status = "pending_verification"
+    profile.verification_date = profile.verification_date or datetime.utcnow()
+    profile.rejection_reason = None
+    profile.verified = False
     db.add(profile)
     db.commit()
     db.refresh(profile)
-    return DoctorProfileRead(
-        id=profile.id,
-        user_id=profile.user_id,
-        specialty=profile.specialty or profile.specialization,
-        hospital=profile.hospital,
-        years_experience=str(profile.years_experience) if profile.years_experience is not None else None,
-        medical_license=getattr(profile, "medical_license", None),
-        bio=profile.bio,
-        license_document_url=profile.license_document_url,
-        verification_status=profile.verification_status,
-    )
+    return profile
 
 
 @router.post("/certificate", response_model=dict)
@@ -163,16 +166,58 @@ async def upload_certificate(
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or unsupported certificate")
 
+    profile.verification_status = profile.verification_status or "pending_verification"
+    profile.verification_status = "pending_verification"
+    profile.verification_date = profile.verification_date or datetime.utcnow()
+    profile.rejection_reason = None
+    profile.verified = False
+
     certificate = Certificate(
         doctor_id=profile.id,
         title=file.filename or "Certificate",
         certificate_url=upload_result.get("secure_url"),
         public_id=upload_result.get("public_id"),
     )
+    db.add(profile)
     db.add(certificate)
     db.commit()
+    db.refresh(profile)
     db.refresh(certificate)
     return {"id": certificate.id, "certificate_url": certificate.certificate_url, "public_id": certificate.public_id}
+
+
+@router.post("/{profile_id}/review", response_model=DoctorProfileRead)
+def review_doctor_profile(
+    profile_id: int,
+    payload: ReviewDecision,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only admins can review doctor profiles")
+
+    profile = db.query(DoctorProfile).filter(DoctorProfile.id == profile_id).first()
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor profile not found")
+
+    decision = (payload.decision or "").strip().lower()
+    if decision not in {"approved", "rejected"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Decision must be 'approved' or 'rejected'")
+
+    if decision == "approved":
+        profile.verification_status = "verified"
+        profile.verified = True
+        profile.rejection_reason = None
+    else:
+        profile.verification_status = "rejected"
+        profile.verified = False
+        profile.rejection_reason = profile.rejection_reason or "Documents were not accepted"
+
+    profile.verification_date = datetime.utcnow()
+    db.add(profile)
+    db.commit()
+    db.refresh(profile)
+    return profile
 
 
 @router.delete("/{profile_id}", response_model=DoctorProfileRead)
@@ -188,3 +233,46 @@ def delete_doctor_profile(profile_id: int, current_user: dict = Depends(get_curr
     db.delete(profile)
     db.commit()
     return profile
+
+
+@router.get("/{profile_id}/statistics", response_model=dict)
+def get_doctor_statistics(profile_id: int, db: Session = Depends(get_db)):
+    """Get comprehensive statistics for a doctor profile"""
+    profile = db.query(DoctorProfile).filter(DoctorProfile.id == profile_id).first()
+    if not profile:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor profile not found")
+    
+    user = db.query(User).filter(User.id == profile.user_id).first() if profile.user_id else None
+    
+    # Calculate profile completion percentage
+    profile_fields = [
+        profile.name,
+        profile.specialty or profile.specialization,
+        profile.hospital,
+        profile.bio,
+        profile.license_document_url,
+    ]
+    completed_fields = sum(1 for field in profile_fields if field)
+    profile_completion = int((completed_fields / len(profile_fields)) * 100) if profile_fields else 0
+    
+    # Count certificates
+    certificates_count = db.query(func.count(Certificate.id)).filter(Certificate.doctor_id == profile_id).scalar() or 0
+    
+    # Count reviews
+    reviews_count = db.query(func.count(Review.id)).filter(Review.doctor_id == profile_id).scalar() or 0
+    
+    # Count SOS incidents
+    sos_count = db.query(func.count(SOSIncident.id)).filter(SOSIncident.doctor_id == profile_id).scalar() or 0
+    
+    return {
+        "profile_completion": profile_completion,
+        "verification_status": profile.verification_status or "not_submitted",
+        "verified": profile.verified,
+        "followers": user.followers_count if user else 0,
+        "following": user.following_count if user else 0,
+        "posts": user.posts_count if user else 0,
+        "reviews": reviews_count,
+        "certificates": certificates_count,
+        "sos_history": sos_count,
+    }
+

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.schemas.post import PostCreate, PostRead
 from app.core.database import get_db
 from app.models.post import Post
+from app.models.post_like import PostLike
 from app.models.user import User, RoleEnum
 from app.api.v1.auth import get_current_user
 
@@ -25,8 +26,8 @@ def list_posts(author_id: int | None = Query(default=None, description="Filter p
 @router.post("/", response_model=PostRead)
 def create_post(payload: PostCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == current_user.get("email")).first()
-    if not user or user.role != RoleEnum.DOCTOR:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only doctors can create posts")
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     post = Post(
         author_name=payload.author_name,
@@ -54,6 +55,16 @@ def like_post(post_id: int, current_user: dict = Depends(get_current_user), db: 
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
 
+    user = db.query(User).filter(User.email == current_user.get("email")).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    existing_like = db.query(PostLike).filter(PostLike.post_id == post.id, PostLike.user_id == user.id).first()
+    if existing_like:
+        db.refresh(post)
+        return post
+
+    db.add(PostLike(post_id=post.id, user_id=user.id))
     post.likes = (post.likes or 0) + 1
     db.commit()
     db.refresh(post)

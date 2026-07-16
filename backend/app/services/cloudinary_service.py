@@ -7,12 +7,13 @@ from fastapi import UploadFile
 from app.core.config import settings
 
 
-cloudinary_config(
-    cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-    api_key=settings.CLOUDINARY_API_KEY,
-    api_secret=settings.CLOUDINARY_API_SECRET,
-    secure=True,
-)
+if settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY and settings.CLOUDINARY_API_SECRET:
+    cloudinary_config(
+        cloud_name=settings.CLOUDINARY_CLOUD_NAME,
+        api_key=settings.CLOUDINARY_API_KEY,
+        api_secret=settings.CLOUDINARY_API_SECRET,
+        secure=True,
+    )
 
 
 ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp'}
@@ -73,18 +74,25 @@ async def _read_upload_data(upload_file: UploadFile) -> bytes:
     return data
 
 
+def _require_cloudinary_config() -> None:
+    if not settings.CLOUDINARY_CLOUD_NAME or not settings.CLOUDINARY_API_KEY or not settings.CLOUDINARY_API_SECRET:
+        raise ValueError("Cloudinary is not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET.")
+
+
 async def _upload_file(
     upload_file: UploadFile,
     resource_type: Optional[str] = None,
     folder: Optional[str] = None,
 ) -> Dict[str, Any]:
+    _require_cloudinary_config()
+
     if resource_type is None:
         resource_type = _detect_resource_type(upload_file.filename, upload_file.content_type)
 
     file_bytes = await _read_upload_data(upload_file)
     options = {
         "resource_type": resource_type,
-        "folder": folder or "healthcare_hub",
+        "folder": (folder or "healthcare_hub").rstrip("/"),
         "use_filename": True,
         "unique_filename": True,
         "overwrite": False,

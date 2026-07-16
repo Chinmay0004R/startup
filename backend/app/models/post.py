@@ -19,3 +19,4 @@ class Post(Base):
 
     author = relationship("User", back_populates="posts")
     comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
+    likes_details = relationship("PostLike", back_populates="post", cascade="all, delete-orphan")

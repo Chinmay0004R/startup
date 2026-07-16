@@ -6,15 +6,20 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.core.database import SessionLocal
+from app.core.security import create_access_token, get_password_hash
 from app.models.email_verification import EmailVerification
-from app.models.user import User
+from app.models.user import User, RoleEnum
 from app.models.doctor_profile import DoctorProfile
 from app.models.certificate import Certificate
 
 
 class SafetyNetworkAPITests(unittest.TestCase):
     def setUp(self):
-        self.client = TestClient(app)
+        self._client_context = TestClient(app)
+        self.client = self._client_context.__enter__()
+
+    def tearDown(self):
+        self._client_context.__exit__(None, None, None)
 
     def login_user(self, email: str, password: str) -> str:
         response = self.client.post(
@@ -52,6 +57,68 @@ class SafetyNetworkAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["name"], payload["name"])
         self.assertEqual(response.json()["registration_number"], payload["registration_number"])
+
+    def test_search_doctors_with_filters(self):
+        unique_city = f"FilterCity-{uuid.uuid4().hex[:8]}"
+        with SessionLocal() as db:
+            matching_user = User(
+                name="Dr. Amina Shah",
+                email=f"filter-match-{uuid.uuid4().hex[:8]}@example.com",
+                role=RoleEnum.DOCTOR,
+                hashed_password="",
+                specialization="Neurology",
+                hospital="Harbor Hospital",
+                years_experience=12,
+                medical_license="REG-FILTER-1",
+                city=unique_city,
+                is_verified=True,
+            )
+            db.add(matching_user)
+            db.flush()
+            matching_profile = DoctorProfile(
+                user_id=matching_user.id,
+                specialty="Neurology",
+                hospital="Harbor Hospital",
+                city=unique_city,
+                state="Sindh",
+                verification_status="verified",
+                verified=True,
+            )
+            db.add(matching_profile)
+
+            other_user = User(
+                name="Dr. Ali Khan",
+                email=f"filter-other-{uuid.uuid4().hex[:8]}@example.com",
+                role=RoleEnum.DOCTOR,
+                hashed_password="",
+                specialization="Cardiology",
+                hospital="Central Hospital",
+                years_experience=5,
+                medical_license="REG-FILTER-2",
+                city="Lahore",
+                is_verified=False,
+            )
+            db.add(other_user)
+            db.flush()
+            other_profile = DoctorProfile(
+                user_id=other_user.id,
+                specialty="Cardiology",
+                hospital="Central Hospital",
+                city="Lahore",
+                state="Punjab",
+                verification_status="pending_verification",
+                verified=False,
+            )
+            db.add(other_profile)
+            db.commit()
+
+        response = self.client.get(
+            f"/api/v1/doctors/?city={unique_city}&state=Sindh&verified=true&min_experience=10"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()), 1)
+        self.assertEqual(response.json()[0]["name"], "Dr. Amina Shah")
 
     def test_search_doctors_by_registration_number(self):
         unique_email = f"naveed+{uuid.uuid4().hex[:8]}@example.com"
@@ -98,6 +165,22 @@ class SafetyNetworkAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["likes"], 1)
 
+    def test_same_user_cannot_like_the_same_post_twice(self):
+        token = self.login_user("testdoctor@example.com", "password123")
+        create_response = self.client.post(
+            "/api/v1/posts/",
+            headers=self.auth_header(token),
+            json={"author_name": "Dr. Naveed", "content": "Please like this post once"},
+        )
+        post_id = create_response.json()["id"]
+
+        first_like = self.client.post(f"/api/v1/posts/{post_id}/like", headers=self.auth_header(token))
+        second_like = self.client.post(f"/api/v1/posts/{post_id}/like", headers=self.auth_header(token))
+
+        self.assertEqual(first_like.status_code, 200)
+        self.assertEqual(second_like.status_code, 200)
+        self.assertEqual(second_like.json()["likes"], 1)
+
     def test_emergency_alert_endpoint(self):
         token = self.login_user("testdoctor@example.com", "password123")
         payload = {
@@ -114,7 +197,7 @@ class SafetyNetworkAPITests(unittest.TestCase):
         payload = {
             "reporter_name": "Ayesha Malik",
             "category": "corruption",
-            "details": "Referral request without consent",
+            "description": "Referral request without consent",
         }
         response = self.client.post("/api/v1/complaints/", headers=self.auth_header(token), json=payload)
         self.assertEqual(response.status_code, 200)
@@ -213,12 +296,15 @@ class SafetyNetworkAPITests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["license_document_url"], "https://res.cloudinary.com/test/license.pdf")
-        self.assertEqual(response.json()["verification_status"], "pending")
+        self.assertEqual(response.json()["verification_status"], "pending_verification")
 
         with SessionLocal() as db:
             profile = db.query(DoctorProfile).filter(DoctorProfile.id == profile_id).first()
             self.assertEqual(profile.license_document_url, "https://res.cloudinary.com/test/license.pdf")
             self.assertEqual(profile.license_public_id, "license-456")
+            self.assertEqual(profile.verification_status, "pending_verification")
+            self.assertIsNotNone(profile.verification_date)
+            self.assertIsNone(profile.rejection_reason)
 
     @patch("app.api.v1.doctor_profiles.upload_asset")
     def test_doctor_certificate_upload_persists_secure_url(self, mock_upload_asset):
@@ -251,6 +337,38 @@ class SafetyNetworkAPITests(unittest.TestCase):
             self.assertIsNotNone(certificate)
             self.assertEqual(certificate.certificate_url, "https://res.cloudinary.com/test/certificate.pdf")
             self.assertEqual(certificate.public_id, "certificate-789")
+
+    def test_admin_can_approve_doctor_profile(self):
+        with SessionLocal() as db:
+            doctor_user = db.query(User).filter(User.email == "testdoctor@example.com").first()
+            profile = DoctorProfile(
+                user_id=doctor_user.id,
+                specialty="Cardiology",
+                hospital="Test Hospital",
+                verification_status="pending_verification",
+                verified=False,
+            )
+            db.add(profile)
+            db.commit()
+            db.refresh(profile)
+            profile_id = profile.id
+
+        admin_token = create_access_token({"email": "admin@example.com", "role": "admin"})
+        response = self.client.post(
+            f"/api/v1/doctor-profiles/{profile_id}/review",
+            headers=self.auth_header(admin_token),
+            json={"decision": "approved"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["verification_status"], "verified")
+        self.assertTrue(response.json()["verified"])
+
+        with SessionLocal() as db:
+            profile = db.query(DoctorProfile).filter(DoctorProfile.id == profile_id).first()
+            self.assertEqual(profile.verification_status, "verified")
+            self.assertTrue(profile.verified)
+            self.assertIsNotNone(profile.verification_date)
 
     @patch("app.api.v1.users.delete_asset")
     @patch("app.api.v1.users.upload_image")

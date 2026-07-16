@@ -1,4 +1,6 @@
+from datetime import datetime
 from pydantic import BaseModel
+from typing import Optional
 
 
 class PostBase(BaseModel):
@@ -14,6 +16,8 @@ class PostCreate(PostBase):
 
 class PostRead(PostBase):
     id: int
+    image_url: Optional[str] = None
+    created_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

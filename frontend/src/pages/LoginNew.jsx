@@ -14,55 +14,15 @@ const Login = ({ mode = 'login', setCurrentRole, setCurrentUserEmail, setAuthTok
     confirmPassword: '',
     otp: '',
   });
-  
   const [isRegistering, setIsRegistering] = useState(mode === 'register');
   const [showVerification, setShowVerification] = useState(false);
   const [verificationOtp, setVerificationOtp] = useState(null);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const navigate = useNavigate();
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim() || '';
-
-  const handleGoogleSuccess = async (response) => {
-    if (!response?.credential) {
-      showNotification('Google sign-in was cancelled.', 'error');
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const googleResponse = await fetch(`${API_BASE_URL}/api/v1/auth/google-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ credential: response.credential }),
-      });
-
-      const data = await googleResponse.json();
-
-      if (!googleResponse.ok) {
-        showNotification(data.detail || 'Google sign-in failed', 'error');
-        setIsLoading(false);
-        return;
-      }
-
-      localStorage.setItem('authToken', data.access_token);
-      localStorage.setItem('currentUserEmail', data.user.email);
-      localStorage.setItem('userName', data.user.name);
-      localStorage.setItem('userId', data.user.id || data.user.email);
-
-      setAuthToken(data.access_token);
-      setCurrentUserEmail(data.user.email);
-      showNotification('Welcome! Your Google account is connected.', 'success');
-      setTimeout(() => navigate('/role-setup'), 500);
-    } catch (error) {
-      showNotification('Google sign-in failed. Please try again.', 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   useEffect(() => {
     setIsRegistering(mode === 'register');
@@ -75,18 +35,34 @@ const Login = ({ mode = 'login', setCurrentRole, setCurrentUserEmail, setAuthTok
     setTimeout(() => setMessage(''), 5000);
   };
 
-  const handleGoogleError = () => {
-    showNotification('Google sign-in could not be started. Please try again.', 'error');
-  };
+  const persistAuthSession = (token, user) => {
+    const role = String(user?.role || '').toLowerCase();
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('currentUserEmail', user.email);
+    localStorage.setItem('userName', user.name);
+    localStorage.setItem('userId', user.id || user.email);
+
+    if (role && role !== 'pending') {
+      localStorage.setItem('currentRole', role);
+      setCurrentRole(role);
+    } else {
+      localStorage.removeItem('currentRole');
+      setCurrentRole(null);
+    }
+
+    setAuthToken(token);
+    setCurrentUserEmail(user.email);
   };
 
   const validateEmail = (email) => {
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return re.test(email);
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleLogin = async (e) => {
@@ -117,23 +93,14 @@ const Login = ({ mode = 'login', setCurrentRole, setCurrentUserEmail, setAuthTok
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         showNotification(data.detail || 'Login failed', 'error');
         setIsLoading(false);
         return;
       }
 
-      // Store auth data temporarily
-      localStorage.setItem('authToken', data.access_token);
-      localStorage.setItem('currentUserEmail', data.user.email);
-      localStorage.setItem('userName', data.user.name);
-      localStorage.setItem('userId', data.user.id || data.user.email);
-
-      setAuthToken(data.access_token);
-      setCurrentUserEmail(data.user.email);
-
-      showNotification(`Welcome back!`, 'success');
+      persistAuthSession(data.access_token, data.user);
+      showNotification('Welcome back!', 'success');
     } catch (error) {
       showNotification('Login failed. Please try again.', 'error');
     } finally {
@@ -177,12 +144,11 @@ const Login = ({ mode = 'login', setCurrentRole, setCurrentUserEmail, setAuthTok
           name: form.name,
           email: form.email,
           password: form.password,
-          role: 'patient',
+          role: 'pending',
         }),
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         showNotification(data.detail || 'Registration failed', 'error');
         setIsLoading(false);
@@ -220,7 +186,6 @@ const Login = ({ mode = 'login', setCurrentRole, setCurrentUserEmail, setAuthTok
       });
 
       const data = await response.json();
-
       if (!response.ok) {
         showNotification(data.detail || 'Verification failed', 'error');
         setIsLoading(false);
@@ -238,273 +203,156 @@ const Login = ({ mode = 'login', setCurrentRole, setCurrentUserEmail, setAuthTok
     }
   };
 
-  const handleGoogleLogin = () => {
-    if (!googleClientId) {
-      showNotification('Google login is not configured yet. Set VITE_GOOGLE_CLIENT_ID to enable it.', 'error');
+  const handleGoogleSuccess = async (response) => {
+    if (!response?.credential) {
+      showNotification('Google sign-in was cancelled.', 'error');
       return;
+    }
+
+    setIsLoading(true);
+    try {
+      const googleResponse = await fetch(`${API_BASE_URL}/api/v1/auth/google-login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential }),
+      });
+
+      const data = await googleResponse.json();
+      if (!googleResponse.ok) {
+        showNotification(data.detail || 'Google sign-in failed', 'error');
+        setIsLoading(false);
+        return;
+      }
+
+      persistAuthSession(data.access_token, data.user);
+      showNotification('Welcome! Your Google account is connected.', 'success');
+      setTimeout(() => navigate('/dashboard'), 500);
+    } catch (error) {
+      showNotification('Google sign-in failed. Please try again.', 'error');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const bgStyle = {
-    minHeight: '100vh',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    padding: '1rem',
+  const handleGoogleError = () => {
+    showNotification('Google sign-in could not be started. Please try again.', 'error');
   };
 
-  const containerStyle = {
-    width: '100%',
-    maxWidth: '400px',
-  };
-
-  const cardStyle = {
-    background: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: '1.5rem',
-    padding: '2.5rem',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-    backdropFilter: 'blur(10px)',
-  };
-
-  const logoStyle = {
-    textAlign: 'center',
-    marginBottom: '2rem',
-  };
-
-  const logoBadgeStyle = {
-    width: '70px',
-    height: '70px',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    borderRadius: '1rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    margin: '0 auto 1rem',
-    fontSize: '2rem',
-    color: 'white',
-    boxShadow: '0 10px 30px rgba(102, 126, 234, 0.3)',
-  };
-
-  const titleStyle = {
-    fontSize: '1.75rem',
-    fontWeight: '700',
-    color: '#1a202c',
-    marginBottom: '0.5rem',
-  };
-
-  const subtitleStyle = {
-    color: '#718096',
-    fontSize: '0.95rem',
-    marginBottom: '0.5rem',
-  };
-
-  const formGroupStyle = {
-    marginBottom: '1.25rem',
-  };
-
-  const labelStyle = {
-    display: 'block',
-    color: '#2d3748',
-    fontWeight: '600',
-    marginBottom: '0.5rem',
-    fontSize: '0.95rem',
-  };
-
-  const inputStyle = {
-    width: '100%',
-    padding: '0.875rem 1rem',
-    border: '2px solid #e2e8f0',
-    borderRadius: '0.75rem',
-    fontSize: '1rem',
-    transition: 'all 0.3s ease',
-    boxSizing: 'border-box',
-  };
-
-  const passwordWrapperStyle = {
-    position: 'relative',
-  };
-
-  const togglePasswordStyle = {
-    position: 'absolute',
-    right: '1rem',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: '#718096',
-    fontSize: '1.1rem',
-  };
-
-  const toggleButtonStyle = {
-    background: 'none',
-    border: 'none',
-    color: '#667eea',
-    fontWeight: '600',
-    cursor: 'pointer',
-    marginLeft: '0.25rem',
-    textDecoration: 'underline',
-  };
-
-  const buttonStyle = {
-    width: '100%',
-    padding: '0.875rem 1.5rem',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: 'white',
-    fontWeight: '600',
-    border: 'none',
-    borderRadius: '0.75rem',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    opacity: isLoading ? 0.7 : 1,
-    pointerEvents: isLoading ? 'none' : 'auto',
-  };
-
-  const messageStyle = {
-    padding: '1rem',
-    borderRadius: '0.75rem',
-    marginBottom: '1rem',
-    fontSize: '0.95rem',
-    backgroundColor: messageType === 'error' ? '#fed7d7' : messageType === 'success' ? '#c6f6d5' : '#bee3f8',
-    color: messageType === 'error' ? '#c53030' : messageType === 'success' ? '#22543d' : '#2c5aa0',
-    border: `1px solid ${messageType === 'error' ? '#fc8181' : messageType === 'success' ? '#9ae6b4' : '#63b3ed'}`,
+  const handleGoogleLogin = () => {
+    if (!googleClientId) {
+      showNotification('Google login is not configured yet. Set VITE_GOOGLE_CLIENT_ID to enable it.', 'error');
+    }
   };
 
   return (
-    <div style={bgStyle}>
-      <div style={containerStyle}>
-        <div style={cardStyle}>
-          {/* Logo */}
-          <div style={logoStyle}>
-            <div style={logoBadgeStyle}>
+    <div className="auth-bg">
+      <div className="auth-container">
+        <div className="auth-card">
+          <div className="auth-logo">
+            <div className="auth-logo-badge">
               <FaStethoscope />
             </div>
-            <h1 style={titleStyle}>Healthcare Hub</h1>
-            <p style={subtitleStyle}>Connect & Share Health Updates</p>
+            <h1 className="auth-title">Healthcare Hub</h1>
+            <p className="auth-subtitle">Connect & Share Health Updates</p>
           </div>
 
-          {/* Message */}
-          {message && <div style={messageStyle}>{message}</div>}
+          {message && <div className={`message-box ${messageType}`}>{message}</div>}
 
           {showVerification ? (
             <form onSubmit={handleVerifyOtp}>
-              <div style={formGroupStyle}>
-                <label style={labelStyle}>Verification Code</label>
+              <div className="form-group">
+                <label className="form-label">Verification Code</label>
                 <input
                   type="text"
                   name="otp"
                   value={form.otp}
                   onChange={handleInputChange}
                   placeholder="Enter code"
-                  style={inputStyle}
+                  className="form-input"
                 />
               </div>
 
               {verificationOtp && (
-                <div style={{ marginBottom: '1rem', color: '#4a5568' }}>
-                  Test OTP: <strong>{verificationOtp}</strong>
-                </div>
+                <div className="auth-helpers">Test OTP: <strong>{verificationOtp}</strong></div>
               )}
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                style={buttonStyle}
-              >
+              <button type="submit" className="auth-button" disabled={isLoading}>
                 {isLoading ? 'Verifying...' : 'Verify Email'}
               </button>
 
-              <div style={{ marginTop: '1.5rem', textAlign: 'center', color: '#718096', fontSize: '0.9rem' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowVerification(false);
-                    setForm((prev) => ({ ...prev, otp: '' }));
-                  }}
-                  style={{ ...toggleButtonStyle, padding: 0 }}
-                >
+              <div className="auth-helpers">
+                <button type="button" className="link-button" onClick={() => {
+                  setShowVerification(false);
+                  setForm((prev) => ({ ...prev, otp: '' }));
+                }}>
                   Back to Registration
                 </button>
               </div>
             </form>
           ) : isRegistering ? (
             <form onSubmit={handleRegister}>
-              <div style={formGroupStyle}>
-                <label style={labelStyle}>Full Name</label>
+              <div className="form-group">
+                <label className="form-label">Full Name</label>
                 <input
                   type="text"
                   name="name"
                   value={form.name}
                   onChange={handleInputChange}
                   placeholder="Your full name"
-                  style={inputStyle}
+                  className="form-input"
                 />
               </div>
 
-              <div style={formGroupStyle}>
-                <label style={labelStyle}>Email Address</label>
+              <div className="form-group">
+                <label className="form-label">Email Address</label>
                 <input
                   type="email"
                   name="email"
                   value={form.email}
                   onChange={handleInputChange}
                   placeholder="your@email.com"
-                  style={inputStyle}
+                  className="form-input"
                 />
               </div>
 
-              <div style={formGroupStyle}>
-                <label style={labelStyle}>Password</label>
-                <div style={passwordWrapperStyle}>
+              <div className="form-group">
+                <label className="form-label">Password</label>
+                <div className="input-wrapper">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     value={form.password}
                     onChange={handleInputChange}
                     placeholder="At least 6 characters"
-                    style={inputStyle}
+                    className="form-input"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={togglePasswordStyle}
-                  >
+                  <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
               </div>
 
-              <div style={formGroupStyle}>
-                <label style={labelStyle}>Confirm Password</label>
-                <div style={passwordWrapperStyle}>
+              <div className="form-group">
+                <label className="form-label">Confirm Password</label>
+                <div className="input-wrapper">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="confirmPassword"
                     value={form.confirmPassword}
                     onChange={handleInputChange}
                     placeholder="Confirm password"
-                    style={inputStyle}
+                    className="form-input"
                   />
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                style={buttonStyle}
-              >
+              <button type="submit" className="auth-button" disabled={isLoading}>
                 {isLoading ? 'Creating account...' : 'Create account'}
               </button>
 
-              <div style={{ margin: '1rem 0', borderTop: '1px solid #e2e8f0', position: 'relative' }}>
-                <span style={{ position: 'absolute', top: '-0.7rem', left: '50%', transform: 'translateX(-50%)', background: 'white', padding: '0 0.75rem', color: '#718096', fontSize: '0.85rem' }}>
-                  or
-                </span>
-              </div>
+              <div className="divider-with-text"><span>or</span></div>
 
-              <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <div>
                 {googleClientId ? (
                   <GoogleLogin
                     onSuccess={handleGoogleSuccess}
@@ -515,46 +363,26 @@ const Login = ({ mode = 'login', setCurrentRole, setCurrentUserEmail, setAuthTok
                     width="100%"
                   />
                 ) : (
-                  <button
-                    type="button"
-                    onClick={handleGoogleLogin}
-                    disabled={isLoading}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem 1.5rem',
-                      background: '#ffffff',
-                      color: '#1f2937',
-                      fontWeight: '600',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.75rem',
-                      fontSize: '1rem',
-                      cursor: 'not-allowed',
-                      transition: 'all 0.3s ease',
-                    }}
-                  >
+                  <button type="button" className="auth-button" disabled>
                     Google login unavailable
                   </button>
                 )}
               </div>
 
-              <div style={{ marginTop: '1.5rem', textAlign: 'center', color: '#718096', fontSize: '0.9rem' }}>
+              <div className="auth-helpers">
                 Already have an account?
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRegistering(false);
-                    setForm({ name: '', email: '', password: '', confirmPassword: '', otp: '' });
-                  }}
-                  style={toggleButtonStyle}
-                >
+                <button type="button" className="link-button" onClick={() => {
+                  setIsRegistering(false);
+                  setForm({ name: '', email: '', password: '', confirmPassword: '', otp: '' });
+                }}>
                   Login
                 </button>
               </div>
             </form>
           ) : (
             <form onSubmit={handleLogin}>
-              <div style={formGroupStyle}>
-                <label style={labelStyle}>
+              <div className="form-group">
+                <label className="form-label">
                   <FaEnvelope style={{ marginRight: '0.5rem' }} />
                   Email Address
                 </label>
@@ -564,49 +392,37 @@ const Login = ({ mode = 'login', setCurrentRole, setCurrentUserEmail, setAuthTok
                   value={form.email}
                   onChange={handleInputChange}
                   placeholder="your@email.com"
-                  style={inputStyle}
+                  className="form-input"
                 />
               </div>
 
-              <div style={formGroupStyle}>
-                <label style={labelStyle}>
+              <div className="form-group">
+                <label className="form-label">
                   <FaLock style={{ marginRight: '0.5rem' }} />
                   Password
                 </label>
-                <div style={passwordWrapperStyle}>
+                <div className="input-wrapper">
                   <input
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     value={form.password}
                     onChange={handleInputChange}
                     placeholder="••••••••"
-                    style={inputStyle}
+                    className="form-input"
                   />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={togglePasswordStyle}
-                  >
+                  <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
                     {showPassword ? <FaEyeSlash /> : <FaEye />}
                   </button>
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                style={buttonStyle}
-              >
+              <button type="submit" className="auth-button" disabled={isLoading}>
                 {isLoading ? 'Logging in...' : 'Login'}
               </button>
 
-              <div style={{ margin: '1rem 0', borderTop: '1px solid #e2e8f0', position: 'relative' }}>
-                <span style={{ position: 'absolute', top: '-0.7rem', left: '50%', transform: 'translateX(-50%)', background: 'white', padding: '0 0.75rem', color: '#718096', fontSize: '0.85rem' }}>
-                  or
-                </span>
-              </div>
+              <div className="divider-with-text"><span>or</span></div>
 
-              <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+              <div>
                 {googleClientId ? (
                   <GoogleLogin
                     onSuccess={handleGoogleSuccess}
@@ -617,38 +433,18 @@ const Login = ({ mode = 'login', setCurrentRole, setCurrentUserEmail, setAuthTok
                     width="100%"
                   />
                 ) : (
-                  <button
-                    type="button"
-                    onClick={handleGoogleLogin}
-                    disabled={isLoading}
-                    style={{
-                      width: '100%',
-                      padding: '0.875rem 1.5rem',
-                      background: '#ffffff',
-                      color: '#1f2937',
-                      fontWeight: '600',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '0.75rem',
-                      fontSize: '1rem',
-                      cursor: 'not-allowed',
-                      transition: 'all 0.3s ease',
-                    }}
-                  >
+                  <button type="button" className="auth-button" disabled>
                     Google login unavailable
                   </button>
                 )}
               </div>
 
-              <div style={{ marginTop: '1.5rem', textAlign: 'center', color: '#718096', fontSize: '0.9rem' }}>
+              <div className="auth-helpers">
                 Don't have an account?
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRegistering(true);
-                    setForm({ name: '', email: '', password: '', confirmPassword: '', otp: '' });
-                  }}
-                  style={toggleButtonStyle}
-                >
+                <button type="button" className="link-button" onClick={() => {
+                  setIsRegistering(true);
+                  setForm({ name: '', email: '', password: '', confirmPassword: '', otp: '' });
+                }}>
                   Register
                 </button>
               </div>

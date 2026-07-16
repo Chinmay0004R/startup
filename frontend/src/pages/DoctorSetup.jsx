@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaStethoscope, FaUpload, FaCheckCircle, FaUsers, FaShieldAlt, FaAward } from 'react-icons/fa';
-import { createDoctorProfile, uploadDoctorLicenseDocument, uploadDoctorCertificate } from '../services/api';
+import { createDoctorProfile, uploadDoctorLicenseDocument, uploadDoctorCertificate, uploadUserProfileImage } from '../services/api';
 
 const DoctorSetup = ({ setCurrentRole }) => {
   const [form, setForm] = useState({
@@ -9,6 +9,7 @@ const DoctorSetup = ({ setCurrentRole }) => {
     hospital: '',
     yearsOfExperience: '',
     medicalLicense: '',
+    profileImage: null,
     certificate: null,
     licenseFile: null,
   });
@@ -30,6 +31,10 @@ const DoctorSetup = ({ setCurrentRole }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleProfileImageChange = (e) => {
+    setForm(prev => ({ ...prev, profileImage: e.target.files[0] }));
   };
 
   const handleFileChange = (e) => {
@@ -90,6 +95,20 @@ const DoctorSetup = ({ setCurrentRole }) => {
     }
 
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+    if (form.profileImage) {
+      if (!allowedTypes.includes(form.profileImage.type) && !['image/webp'].includes(form.profileImage.type)) {
+        showNotification('Unsupported profile image format. Use JPG, PNG, or WEBP.', 'error');
+        setIsLoading(false);
+        return;
+      }
+
+      if (form.profileImage.size > 10 * 1024 * 1024) {
+        showNotification('Profile image must be 10 MB or smaller.', 'error');
+        setIsLoading(false);
+        return;
+      }
+    }
+
     if (!allowedTypes.includes(form.certificate.type)) {
       showNotification('Unsupported certificate format. Upload PDF or image files only.', 'error');
       setIsLoading(false);
@@ -133,9 +152,16 @@ const DoctorSetup = ({ setCurrentRole }) => {
         bio: form.bio || '',
       };
 
-      const createdProfile = await createDoctorProfile(doctorPayload, token);
-      setUploadStatus('Uploading license document...');
+      await createDoctorProfile(doctorPayload, token);
 
+      if (form.profileImage) {
+        setUploadStatus('Uploading profile photo...');
+        const profileImageFormData = new FormData();
+        profileImageFormData.append('file', form.profileImage);
+        await uploadUserProfileImage(profileImageFormData, token, setUploadProgress);
+      }
+
+      setUploadStatus('Uploading license document...');
       const licenseFormData = new FormData();
       licenseFormData.append('file', form.licenseFile);
       await uploadDoctorLicenseDocument(licenseFormData, token, setUploadProgress);
@@ -144,7 +170,7 @@ const DoctorSetup = ({ setCurrentRole }) => {
       certificateFormData.append('file', form.certificate);
       await uploadDoctorCertificate(certificateFormData, token, setUploadProgress);
       setUploadStatus('Upload complete.');
-      showNotification('Professional profile, license, and certificate uploaded successfully!', 'success');
+      showNotification('Professional profile saved. Your verification request is now pending review.', 'success');
 
       localStorage.setItem('currentRole', 'doctor');
       setCurrentRole('doctor');
@@ -165,7 +191,7 @@ const DoctorSetup = ({ setCurrentRole }) => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'var(--color-cream-paper)',
     padding: '1rem',
   };
 
@@ -175,17 +201,18 @@ const DoctorSetup = ({ setCurrentRole }) => {
   };
 
   const cardStyle = {
-    background: 'rgba(255, 255, 255, 0.95)',
+    background: 'var(--color-frost-white)',
     borderRadius: '1.5rem',
+    border: '1px solid var(--color-charcoal-ink)',
     padding: '2.5rem',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+    boxShadow: 'var(--shadow-hard)',
     backdropFilter: 'blur(10px)',
   };
 
   const titleStyle = {
     fontSize: '1.75rem',
-    fontWeight: '700',
-    color: '#1a202c',
+    fontWeight: '800',
+    color: 'var(--color-charcoal-ink)',
     marginBottom: '0.5rem',
     display: 'flex',
     alignItems: 'center',
@@ -193,7 +220,7 @@ const DoctorSetup = ({ setCurrentRole }) => {
   };
 
   const subtitleStyle = {
-    color: '#718096',
+    color: 'var(--color-pencil-gray)',
     fontSize: '0.95rem',
     marginBottom: '2rem',
   };
@@ -201,7 +228,7 @@ const DoctorSetup = ({ setCurrentRole }) => {
   const sectionTitleStyle = {
     margin: 0,
     fontSize: '1rem',
-    color: '#1a202c',
+    color: 'var(--color-charcoal-ink)',
     fontWeight: 700,
   };
 
@@ -209,9 +236,9 @@ const DoctorSetup = ({ setCurrentRole }) => {
     marginBottom: '1.5rem',
     padding: '1rem 1.25rem',
     borderRadius: '1rem',
-    background: messageType === 'success' ? '#ecfdf5' : '#fef2f2',
-    color: messageType === 'success' ? '#065f46' : '#991b1b',
-    border: `1px solid ${messageType === 'success' ? '#a7f3d0' : '#fecaca'}`,
+    background: messageType === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+    color: messageType === 'success' ? '#86efac' : '#fca5a5',
+    border: `1px solid ${messageType === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
   };
 
   const formGroupStyle = {
@@ -220,7 +247,7 @@ const DoctorSetup = ({ setCurrentRole }) => {
 
   const labelStyle = {
     display: 'block',
-    color: '#2d3748',
+    color: 'var(--color-pencil-gray)',
     fontWeight: '600',
     marginBottom: '0.5rem',
     fontSize: '0.95rem',
@@ -229,23 +256,26 @@ const DoctorSetup = ({ setCurrentRole }) => {
   const inputStyle = {
     width: '100%',
     padding: '0.875rem 1rem',
-    border: '2px solid #e2e8f0',
+    border: '1px solid var(--color-charcoal-ink)',
     borderRadius: '0.75rem',
     fontSize: '1rem',
     transition: 'all 0.3s ease',
     boxSizing: 'border-box',
+    backgroundColor: 'var(--color-frost-white)',
+    color: 'var(--color-charcoal-ink)',
   };
 
   const fileInputStyle = {
     display: 'block',
     width: '100%',
     padding: '1rem',
-    border: '2px dashed #e2e8f0',
+    border: '2px dashed rgba(148, 163, 184, 0.4)',
     borderRadius: '0.75rem',
     textAlign: 'center',
     cursor: 'pointer',
     transition: 'all 0.3s ease',
-    background: '#f7fafc',
+    background: 'var(--color-frost-white)',
+    color: 'var(--color-pencil-gray)',
   };
 
   const buttonGroupStyle = {
@@ -257,7 +287,7 @@ const DoctorSetup = ({ setCurrentRole }) => {
 
   const submitButtonStyle = {
     padding: '0.875rem 1.5rem',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'var(--color-sky-crayon)',
     color: 'white',
     fontWeight: '600',
     border: 'none',
@@ -267,14 +297,15 @@ const DoctorSetup = ({ setCurrentRole }) => {
     transition: 'all 0.3s ease',
     opacity: isLoading ? 0.7 : 1,
     pointerEvents: isLoading ? 'none' : 'auto',
+    boxShadow: '0 5px 15px rgba(37, 99, 235, 0.3)',
   };
 
   const skipButtonStyle = {
     padding: '0.875rem 1.5rem',
     background: 'transparent',
-    color: '#667eea',
+    color: 'var(--color-sky-crayon)',
     fontWeight: '600',
-    border: '2px solid #667eea',
+    border: '1px solid rgba(37, 99, 235, 0.3)',
     borderRadius: '0.75rem',
     fontSize: '1rem',
     cursor: 'pointer',
@@ -303,7 +334,7 @@ const DoctorSetup = ({ setCurrentRole }) => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #0f172a 0%, #1a2941 50%, #0f172a 100%)',
     padding: '1.5rem',
   };
 
@@ -319,11 +350,11 @@ const DoctorSetup = ({ setCurrentRole }) => {
   };
 
   const setupCardStyle = {
-    background: 'rgba(255, 255, 255, 0.96)',
+    background: 'var(--color-frost-white)',
     borderRadius: '1.5rem',
     padding: '2rem',
-    boxShadow: '0 24px 70px rgba(0, 0, 0, 0.18)',
-    border: '1px solid rgba(255,255,255,0.35)',
+    boxShadow: '0 24px 70px rgba(0, 0, 0, 0.3)',
+    border: '1px solid var(--color-charcoal-ink)',
   };
 
   const rightCardStyle = {
@@ -332,11 +363,11 @@ const DoctorSetup = ({ setCurrentRole }) => {
   };
 
   const sidebarCardStyle = {
-    background: 'rgba(255, 255, 255, 0.94)',
+    background: 'var(--color-frost-white)',
     borderRadius: '1.4rem',
     padding: '1.5rem',
-    boxShadow: '0 18px 40px rgba(0, 0, 0, 0.14)',
-    border: '1px solid rgba(229, 231, 235, 0.6)',
+    boxShadow: 'var(--shadow-hard)',
+    border: '1px solid var(--color-charcoal-ink)',
   };
 
   const sectionHeaderStyle = {
@@ -495,6 +526,27 @@ const DoctorSetup = ({ setCurrentRole }) => {
                   placeholder="e.g., DMC/2024/001234"
                   style={inputStyle}
                 />
+              </div>
+
+              <div style={formGroupStyle}>
+                <label style={labelStyle}>Profile Photo</label>
+                <label style={fileInputStyle}>
+                  <input
+                    type="file"
+                    onChange={handleProfileImageChange}
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+                    <FaUpload style={{ fontSize: '1.5rem', color: '#667eea' }} />
+                    <span style={{ color: '#667eea', fontWeight: '600' }}>
+                      {form.profileImage ? form.profileImage.name : 'Click to upload profile photo'}
+                    </span>
+                    <span style={{ fontSize: '0.85rem', color: '#718096' }}>
+                      JPG, PNG, WEBP up to 10MB
+                    </span>
+                  </div>
+                </label>
               </div>
 
               <div style={formGroupStyle}>
