@@ -118,7 +118,7 @@ def _validate_google_token(credential: str) -> dict:
     return payload
 
 
-def get_current_user(credentials = Depends(security)) -> dict:
+def get_current_user(credentials = Depends(security), db: Session = Depends(get_db)) -> dict:
     """Get current authenticated user from JWT token"""
     token = credentials.credentials
     payload = verify_token(token)
@@ -127,6 +127,14 @@ def get_current_user(credentials = Depends(security)) -> dict:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    email = payload.get("email")
+    if not email or not db.query(User).filter(User.email == email).first():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account no longer exists",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
